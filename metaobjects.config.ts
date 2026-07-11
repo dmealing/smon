@@ -13,6 +13,13 @@ import { barrel } from "./codegen/generators/barrel";
 import { promptRender, renderHelper } from "@metaobjectsdev/codegen-ts/generators";
 // smon's own metamodel vocabulary (Task 5) — adapter.notify + probe.bash.
 import { smonMonitorTypes } from "./codegen/smon-provider";
+// smon's own codegen (Task 7) — walks adapter.notify / probe.bash nodes and
+// emits the notify registry (data half — see notify-registry.ts header for
+// why impls aren't wired here yet), the probe roster, and the drift-free
+// monitoring docs page.
+import { notifyRegistry } from "./codegen/generators/notify-registry";
+import { probeRoster } from "./codegen/generators/probe-roster";
+import { monitorDocs } from "./codegen/generators/monitor-docs";
 
 export default defineConfig({
   outDir:    "src/generated",
@@ -28,6 +35,9 @@ export default defineConfig({
     barrel(),
     promptRender(),
     renderHelper(),
+    notifyRegistry(),
+    probeRoster(),
+    monitorDocs(),
   ],
   docs: {
     outDir:   "./docs",        // model + api surfaces both land here (run: meta docs)
