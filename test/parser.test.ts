@@ -12,7 +12,7 @@
 // diagnostics non-deterministically instead of a controlled fixture.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseVerdict, runProbe } from "../src/probes/runner";
@@ -224,5 +224,66 @@ describe("runProbe", () => {
       tag: "PROBE_MISSING",
       prose: `probe 'runaway-hunter' is missing or not executable at ${binDir}`,
     });
+  });
+
+  // Task 8 incident regression (see task-8-report.md): a probe that traps/ignores SIGTERM makes
+  // `proc.exited` never resolve, so the OLD runProbe (bare SIGTERM, then `await proc.exited`)
+  // hung forever — a `bun test` run once pegged a CPU core for ~53 minutes this way. The timeout
+  // guard must be unconditional: SIGTERM first, then an escalating SIGKILL backstop, and
+  // `runProbe` must resolve either way instead of depending on the child ever cooperating.
+  test("a probe that traps SIGTERM is force-killed via SIGKILL; runProbe still resolves to FAIL/PROBE_TIMEOUT", async () => {
+    // Use the unused "smart-health" roster entry as this fixture's name — its `script` field
+    // ("smart-health") is what runProbe resolves to `${binDir}/smart-health`, so the fixture
+    // file must live at that exact path.
+    const pidFile = join(binDir, "smart-health.pid");
+    // Writes its own pid before installing the trap, so the test can independently verify the
+    // real OS process is dead afterward (the leak check) without relying on runProbe's return
+    // value alone. `setsid`-spawned (detached:true), so this script's own pid is also its
+    // process-group id — matching what runProbe negates when it signals the group.
+    await writeFile(
+      join(binDir, "smart-health"),
+      `#!/usr/bin/env bash\necho $$ > "${pidFile}"\ntrap "" SIGTERM\nsleep 30\n`,
+    );
+    await chmod(join(binDir, "smart-health"), 0o755);
+
+    // Hard test-level guard: if the fix regresses back to hanging on an uncooperative proc.exited,
+    // fail the test promptly instead of hanging the whole suite for 30s+.
+    const hangGuard = new Promise<never>((_, reject) => {
+      setTimeout(
+        () => reject(new Error("runProbe did not resolve — timeout handling is hanging again")),
+        5000,
+      );
+    });
+
+    const verdict = await Promise.race([
+      runProbe("smart-health", { binDir, timeoutMs: 300, killGraceMs: 300 }),
+      hangGuard,
+    ]);
+
+    expect(verdict).toEqual({
+      status: "FAIL",
+      tag: "PROBE_TIMEOUT",
+      prose: "probe did not finish within 0.3s",
+    });
+
+    // Leak check: the trapped process must actually be dead (SIGKILL landed), not merely
+    // abandoned as an orphan still holding a CPU core / sleeping for its full 30s.
+    const pid = Number((await readFile(pidFile, "utf8")).trim());
+    expect(Number.isInteger(pid) && pid > 0).toBe(true);
+
+    const isAlive = () => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const deadline = Date.now() + 2000;
+    while (isAlive() && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    expect(isAlive()).toBe(false);
   });
 });

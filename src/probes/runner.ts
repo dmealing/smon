@@ -109,11 +109,28 @@ function isTimeoutExitCode(code: number): boolean {
   return code === 124 || code === 137 || code === 143;
 }
 
+// bash-adjacent, but with no bash equivalent: GNU coreutils `timeout` only sends this second,
+// harder signal when invoked with `-k DURATION` — the bash reference does NOT use `-k`, so a
+// probe that ignores/traps SIGTERM (or is stuck uninterruptibly) can absorb the first signal and
+// run forever. smon always escalates; this is the grace period between the two signals.
+const DEFAULT_KILL_GRACE_MS = 2000;
+
+function defaultKillGraceMs(): number {
+  const raw = process.env.SMON_PROBE_KILL_GRACE_MS;
+  if (raw === undefined || raw === "") return DEFAULT_KILL_GRACE_MS;
+  const ms = Number(raw);
+  return Number.isFinite(ms) && ms >= 0 ? ms : DEFAULT_KILL_GRACE_MS;
+}
+
 export interface RunProbeOptions {
   /** Milliseconds before treating the probe as PROBE_TIMEOUT. Defaults to `SMON_PROBE_TIMEOUT`
    *  (seconds, matching the bash reference's env var) or 120s. Override in tests to avoid
    *  waiting on the real default. */
   timeoutMs?: number;
+  /** Milliseconds to wait after SIGTERM before escalating to an unconditional SIGKILL of the
+   *  probe's process group. Defaults to `SMON_PROBE_KILL_GRACE_MS` or 2000ms. Override in tests
+   *  to avoid waiting on the real default. */
+  killGraceMs?: number;
   /** Resolve the probe's script from this directory instead of a bare-name PATH lookup.
    *  Production callers omit this — probes are installed on PATH (unlike the bash reference,
    *  which always execs a fixed `$PROBE_BIN/$probe` path). Tests point this at a fixture
@@ -130,6 +147,16 @@ function trySpawn(command: string) {
   }
 }
 
+/** Resolves to `value` after `ms`, exposing a `cancel()` so callers can always clear the timer
+ *  (used to guarantee no dangling `setTimeout` survives `runProbe`, whichever branch wins). */
+function delay<T>(ms: number, value: T): { promise: Promise<T>; cancel: () => void } {
+  let timer: ReturnType<typeof setTimeout>;
+  const promise = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(value), ms);
+  });
+  return { promise, cancel: () => clearTimeout(timer) };
+}
+
 /**
  * Run one roster probe and turn its outcome into a Verdict. Mirrors bash `eval_probe`'s
  * probe-exec block:
@@ -144,10 +171,21 @@ function trySpawn(command: string) {
  * own — verified empirically while building this (see task-8-report.md). GNU coreutils
  * `timeout`, which the bash reference uses, avoids this by killing the whole process group by
  * default; group-killing here reproduces that reliability rather than the bug.
+ *
+ * The timeout guard is UNCONDITIONAL, matching `timeout -k` rather than plain `timeout`: SIGTERM
+ * is sent to the group first, but `runProbe` does NOT simply `await proc.exited` afterward — a
+ * probe (or a wedged descendant) that ignores/traps SIGTERM, or is stuck uninterruptibly, would
+ * leave that promise unsettled forever, hanging `runProbe` and leaking the orphan (this is the
+ * exact incident root cause — see task-8-report.md: a `bun test` run once pegged a CPU core for
+ * ~53 minutes this way). Instead, once the timeout fires, `runProbe` races `proc.exited` against
+ * a short `killGraceMs` grace timer; if the process group hasn't exited by then, it sends an
+ * unconditional SIGKILL backstop and resolves to PROBE_TIMEOUT regardless of whether/when
+ * `proc.exited` ever settles.
  */
 export async function runProbe(name: ProbeName, opts: RunProbeOptions = {}): Promise<Verdict> {
   const { script } = PROBES[name];
   const timeoutMs = opts.timeoutMs ?? defaultTimeoutMs();
+  const killGraceMs = opts.killGraceMs ?? defaultKillGraceMs();
   const command = opts.binDir ? `${opts.binDir}/${script}` : script;
 
   const proc = trySpawn(command);
@@ -160,16 +198,30 @@ export async function runProbe(name: ProbeName, opts: RunProbeOptions = {}): Pro
     };
   }
 
-  const timer = setTimeout(() => {
-    try {
-      process.kill(-proc.pid, "SIGTERM");
-    } catch {
-      // Already gone between the timer firing and the kill — nothing to do.
-    }
-  }, timeoutMs);
+  // Consumed by whichever race branch below wins; catch up front so a losing branch's eventual
+  // settlement (e.g. a stdout stream error surfacing after we've already moved on to the timeout
+  // path) never becomes an unhandled rejection.
+  const stdoutPromise = new Response(proc.stdout).text();
+  stdoutPromise.catch(() => {});
+  const exitedPromise = proc.exited;
+  exitedPromise.catch(() => {});
 
-  try {
-    const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+  const finishedOutcome = Promise.all([stdoutPromise, exitedPromise]).then(
+    (result) => ({ kind: "finished" as const, result }),
+    (err: unknown) => ({ kind: "error" as const, err }),
+  );
+  const { promise: timeoutSignal, cancel: cancelTimeout } = delay(timeoutMs, {
+    kind: "timeout" as const,
+  });
+
+  const first = await Promise.race([finishedOutcome, timeoutSignal]);
+  cancelTimeout();
+
+  if (first.kind === "error") {
+    throw first.err;
+  }
+  if (first.kind === "finished") {
+    const [stdout, exitCode] = first.result;
     if (isTimeoutExitCode(exitCode)) {
       return {
         status: "FAIL",
@@ -178,7 +230,32 @@ export async function runProbe(name: ProbeName, opts: RunProbeOptions = {}): Pro
       };
     }
     return parseVerdict(stdout);
-  } finally {
-    clearTimeout(timer);
   }
+
+  // Timed out. SIGTERM the whole group first — lets a cooperative probe clean up.
+  try {
+    process.kill(-proc.pid, "SIGTERM");
+  } catch {
+    // Already gone between the timer firing and the kill — nothing to do.
+  }
+
+  // Give it killGraceMs to actually exit; if not, SIGKILL is an unconditional backstop. Either
+  // way, resolve now rather than waiting further on `exitedPromise`.
+  const { promise: graceSignal, cancel: cancelGrace } = delay(killGraceMs, "grace-expired" as const);
+  const survived = await Promise.race([exitedPromise.then(() => "exited" as const), graceSignal]);
+  cancelGrace();
+
+  if (survived === "grace-expired") {
+    try {
+      process.kill(-proc.pid, "SIGKILL");
+    } catch {
+      // Already gone.
+    }
+  }
+
+  return {
+    status: "FAIL",
+    tag: "PROBE_TIMEOUT",
+    prose: `probe did not finish within ${timeoutMs / 1000}s`,
+  };
 }
