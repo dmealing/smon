@@ -11,6 +11,8 @@ import { barrel } from "./codegen/generators/barrel";
 // the render engine for template.prompt / template.output nodes and don't need
 // per-project customization, so they aren't scaffold-and-own like the ones above.
 import { promptRender, renderHelper } from "@metaobjectsdev/codegen-ts/generators";
+// smon's own metamodel vocabulary (Task 5) — adapter.notify + probe.bash.
+import { smonMonitorTypes } from "./codegen/smon-provider";
 
 export default defineConfig({
   outDir:    "src/generated",
@@ -18,6 +20,7 @@ export default defineConfig({
   dbImport:  "../db",
   dialect:   "sqlite",
   apiPrefix: "",     // set to "/api" if your routes mount under /api
+  providers: [smonMonitorTypes],
   generators: [
     entityFile(),
     queriesFile(),
