@@ -122,6 +122,19 @@ describe("smon-monitor-types provider", () => {
     expect(codesOf(errors)).toContain("ERR_SMON_PAYLOAD_REF_UNRESOLVED");
   });
 
+  it("an adapter whose @digestPayloadRef doesn't resolve to an object.value reports ERR_SMON_DIGEST_PAYLOAD_REF_UNRESOLVED", async () => {
+    const { errors } = await load(`
+      ${PAYLOADS_AND_TEMPLATES},
+      { "adapter.notify": {
+          "name": "BrokenDigestAdapter",
+          "@kind": "push",
+          "@payloadRef": "AlertPayload",
+          "@digestPayloadRef": "NoSuchDigestPayload"
+      }}
+    `);
+    expect(codesOf(errors)).toContain("ERR_SMON_DIGEST_PAYLOAD_REF_UNRESOLVED");
+  });
+
   it("an @alertTemplateRef that doesn't resolve to a template.output reports ERR_SMON_TEMPLATE_REF_UNRESOLVED", async () => {
     const { errors } = await load(`
       { "object.value": { "name": "AlertPayload", "children": [
@@ -135,6 +148,21 @@ describe("smon-monitor-types provider", () => {
       }}
     `);
     expect(codesOf(errors)).toContain("ERR_SMON_TEMPLATE_REF_UNRESOLVED");
+  });
+
+  it("an @alertTemplateRef that resolves to a non-email template.output reports ERR_SMON_TEMPLATE_REF_NOT_EMAIL", async () => {
+    const { errors } = await load(`
+      ${PAYLOADS_AND_TEMPLATES},
+      { "template.output": { "name": "AlertDocument", "@kind": "document",
+          "@payloadRef": "AlertPayload", "@textRef": "docs/alert.txt" } },
+      { "adapter.notify": {
+          "name": "WrongKindTemplateAdapter",
+          "@kind": "email",
+          "@payloadRef": "AlertPayload",
+          "@alertTemplateRef": "AlertDocument"
+      }}
+    `);
+    expect(codesOf(errors)).toContain("ERR_SMON_TEMPLATE_REF_NOT_EMAIL");
   });
 
   it("an @alertTemplateRef whose template.output @payloadRef mismatches reports ERR_SMON_TEMPLATE_PAYLOAD_MISMATCH", async () => {
