@@ -11,7 +11,7 @@
 // `command -v`), so exercising the bare-name PATH-lookup branch here would run real
 // diagnostics non-deterministically instead of a controlled fixture.
 
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -161,6 +161,12 @@ describe("parseVerdict", () => {
 
 describe("runProbe", () => {
   let binDir: string;
+  // Pid-file paths for any long-lived, SIGTERM-trapping fixture a test spawns. Populated by the
+  // test itself (the fixture writes its own pid to this file before installing the trap), and
+  // swept unconditionally in afterEach below — an independent backstop that does NOT trust
+  // runProbe to have done its job, so a regression in runProbe's SIGKILL escalation can't leak
+  // the fixture process out of the test suite.
+  const spawnedFixturePidFiles: string[] = [];
 
   beforeAll(async () => {
     binDir = await mkdtemp(join(tmpdir(), "smon-runner-test-"));
@@ -187,6 +193,30 @@ describe("runProbe", () => {
 
   afterAll(async () => {
     await rm(binDir, { recursive: true, force: true });
+  });
+
+  afterEach(async () => {
+    // Independent backstop, unconditional: force-kill any fixture pid a test tracked, whether
+    // or not runProbe's own SIGKILL escalation succeeded, and whether or not the test itself
+    // threw/timed out. Negated pid first (the fixture is spawned via `setsid`, so its own pid
+    // doubles as its process-group id — same target runProbe signals), then the plain pid as a
+    // fallback. Both are swallowed on ESRCH (already dead) or any other error.
+    for (const pidFile of spawnedFixturePidFiles) {
+      try {
+        const pid = Number((await readFile(pidFile, "utf8")).trim());
+        if (Number.isInteger(pid) && pid > 0) {
+          try {
+            process.kill(-pid, "SIGKILL");
+          } catch {}
+          try {
+            process.kill(pid, "SIGKILL");
+          } catch {}
+        }
+      } catch {
+        // No pid file (fixture never started, or already cleaned up) — nothing to do.
+      }
+    }
+    spawnedFixturePidFiles.length = 0;
   });
 
   test("runs a probe and parses its verdict", async () => {
@@ -236,6 +266,10 @@ describe("runProbe", () => {
     // ("smart-health") is what runProbe resolves to `${binDir}/smart-health`, so the fixture
     // file must live at that exact path.
     const pidFile = join(binDir, "smart-health.pid");
+    // Track this fixture's pid file so the afterEach backstop above can independently force-kill
+    // it — regardless of whether runProbe's own SIGKILL escalation works — so a regression here
+    // can't leak the fixture out of this test.
+    spawnedFixturePidFiles.push(pidFile);
     // Writes its own pid before installing the trap, so the test can independently verify the
     // real OS process is dead afterward (the leak check) without relying on runProbe's return
     // value alone. `setsid`-spawned (detached:true), so this script's own pid is also its
@@ -248,17 +282,20 @@ describe("runProbe", () => {
 
     // Hard test-level guard: if the fix regresses back to hanging on an uncooperative proc.exited,
     // fail the test promptly instead of hanging the whole suite for 30s+.
+    let hangGuardTimer!: ReturnType<typeof setTimeout>;
     const hangGuard = new Promise<never>((_, reject) => {
-      setTimeout(
+      hangGuardTimer = setTimeout(
         () => reject(new Error("runProbe did not resolve — timeout handling is hanging again")),
         5000,
       );
     });
 
+    // Clear the hang-guard timer as soon as the race settles (whichever side wins) so it never
+    // dangles past this test — cosmetic, but there's no reason to leave a live timer behind.
     const verdict = await Promise.race([
       runProbe("smart-health", { binDir, timeoutMs: 300, killGraceMs: 300 }),
       hangGuard,
-    ]);
+    ]).finally(() => clearTimeout(hangGuardTimer));
 
     expect(verdict).toEqual({
       status: "FAIL",
