@@ -1,47 +1,62 @@
 // The verdict parser + probe runner — the bridge between the small-model-skills bash
-// diagnostic probes and typed Verdicts. Mirrors, byte-for-byte, the bash reference:
+// diagnostic probes and typed Verdicts. Loosely follows the bash reference:
 //   ~/Development/small-model-skills/monitor/bin/smon's `parse_verdict` function and the
 //   probe-exec block of `eval_probe`.
 // Contract: ~/Development/small-model-skills/docs/verdict-contract.md.
 //
 // Pure TypeScript runtime glue for Task 12's sweep loop — no metaobjects machinery here.
+//
+// DELIBERATE DIVERGENCE FROM BASH (owner-approved): the bash reference has two latent parsing
+// bugs (see VERDICT_LINE_PATTERN below). smon is the source of truth for CORRECTNESS against
+// the published contract, not for byte-for-byte parity with bash's bugs, so both are fixed here
+// even though the bash script still has them.
 
 import type { Verdict, VerdictStatus } from "../generated";
 import { PROBES, type ProbeName } from "../generated/probes/roster";
 
 const VERDICT_PREFIX = "verdict: ";
 
-// Mirrors bash's `sed 's/^verdict: [A-Z]* [A-Z_]* — //'`.
+// The one correct pattern for a well-formed verdict line, straight from the published grammar
+// (verdict-contract.md §1 and §3): `verdict: <STATUS> <TAG> — <prose>` where STATUS is one of
+// OK|WARN|FAIL and TAG matches `^[A-Z][A-Z0-9_]{1,23}$` (starts with a letter, 2-24 chars total,
+// digits legal). The separator is a literal " — " (space, em dash U+2014, space).
 //
-// NOTE (surprising bash behavior, reproduced deliberately): the tag portion of this pattern
-// only allows [A-Z_] — no digits — even though the public tag grammar
-// (`^[A-Z][A-Z0-9_]{1,23}$`, verdict-contract.md §3) permits them. If a real tag ever contains
-// a digit, this pattern fails to match anywhere in the line, and — matching sed's `s///`
-// leaving a non-matching line untouched — the "prose" falls back to the ENTIRE raw verdict
-// line instead of just the text after the em dash. That's a genuine bug in the bash reference,
-// not a design choice. It's mirrored here for byte-for-byte parity with the bash oracle (none
-// of the current roster's tags contain digits, so it's latent today).
-const PROSE_PATTERN = /^verdict: [A-Z]* [A-Z_]* — (.*)$/;
+// Bash's reference implementation gets this wrong two ways that smon fixes rather than mirrors:
+//  1. Its prose-stripping sed pattern is `s/^verdict: [A-Z]* [A-Z_]* — //` — the tag portion
+//     excludes digits, so a real tag containing one (e.g. `DISK90`) makes the whole substitution
+//     fail to match anywhere in the line, and since sed's `s///` leaves a non-matching line
+//     untouched, the "prose" falls back to the entire raw verdict line instead of just the text
+//     after the em dash.
+//  2. Bash's tag check only rejects an empty tag or a tag that is literally the em dash itself
+//     (awk's field 3 landing on the separator when the tag is missing) — anything else,
+//     including lowercase or out-of-length garbage, is accepted verbatim as TAG with no grammar
+//     validation at all.
+// smon parses status/tag/prose with a single regex built from the real grammar, and treats any
+// verdict line that doesn't match it (valid STATUS but a TAG that fails the grammar) as
+// malformed — the same FAIL/BAD_VERDICT shape already used for an invalid STATUS.
+const VERDICT_LINE_PATTERN = /^verdict: (OK|WARN|FAIL) ([A-Z][A-Z0-9_]{1,23}) — (.*)$/;
 
 function isVerdictStatus(value: string): value is VerdictStatus {
   return value === "OK" || value === "WARN" || value === "FAIL";
 }
 
 /**
- * Parse a probe's full stdout into a Verdict. Mirrors bash `parse_verdict` exactly:
- *  - `grep -m1 '^verdict: '` — the FIRST line starting at column 0 with "verdict: " wins. A
- *    verdict line that isn't at column 0 (indented, or preceded by other text on that line) is
- *    invisible to this parser, same as bash's anchored grep — it falls through to NO_VERDICT
- *    (or to a later matching line, if any).
- *  - no such line             -> FAIL/NO_VERDICT, prose "probe emitted no verdict line".
- *  - STATUS not OK|WARN|FAIL  -> FAIL/BAD_VERDICT, prose "unparseable verdict: <line>".
+ * Parse a probe's full stdout into a Verdict.
+ *  - `grep -m1 '^verdict: '`-equivalent: the FIRST line starting at column 0 with "verdict: "
+ *    wins. A verdict line that isn't at column 0 (indented, or preceded by other text on that
+ *    line) is invisible to this parser — it falls through to NO_VERDICT (or to a later matching
+ *    line, if any). This column-0 anchoring matches bash's `grep -m1 '^verdict: '` and is
+ *    correct, not a bug.
+ *  - no such line                   -> FAIL/NO_VERDICT, prose "probe emitted no verdict line".
+ *  - line matches the full grammar  -> the parsed {status, tag, prose}; prose is exactly the
+ *    text after the em dash (a tag with digits, e.g. `DISK90`, parses fine — see above).
+ *  - STATUS not OK|WARN|FAIL        -> FAIL/BAD_VERDICT, prose "unparseable verdict: <line>".
  *  - TAG empty or literally "—" (awk's 3rd field lands on the em dash when the tag is missing,
  *    e.g. "verdict: OK — prose") -> FAIL/BAD_VERDICT, prose "malformed verdict (missing tag): <line>".
- *  - otherwise                -> the parsed {status, tag, prose}.
- *
- * Note bash's tag handling is looser than the published grammar: anything non-empty and not
- * "—" is accepted as TAG verbatim (no regex validation against `^[A-Z][A-Z0-9_]{1,23}$`). That
- * is mirrored here too — this parser does not reject a malformed-but-non-empty tag.
+ *  - STATUS valid but TAG doesn't match `^[A-Z][A-Z0-9_]{1,23}$` (lowercase, too short/long,
+ *    leading digit, etc.), or the line otherwise doesn't fit the contract shape -> FAIL/BAD_VERDICT,
+ *    prose "unparseable verdict: <line>" (same shape as an invalid STATUS — both mean "this line
+ *    doesn't parse as a verdict", so both get the same treatment).
  */
 export function parseVerdict(stdout: string): Verdict {
   const vline = stdout.split("\n").find((line) => line.startsWith(VERDICT_PREFIX));
@@ -49,20 +64,32 @@ export function parseVerdict(stdout: string): Verdict {
     return { status: "FAIL", tag: "NO_VERDICT", prose: "probe emitted no verdict line" };
   }
 
-  // awk field splitting: runs of whitespace, ignoring leading/trailing whitespace.
+  const match = vline.match(VERDICT_LINE_PATTERN);
+  if (match) {
+    const status = match[1] ?? "";
+    const tag = match[2] ?? "";
+    const prose = match[3] ?? "";
+    return { status: status as VerdictStatus, tag, prose };
+  }
+
+  // Didn't fit the full contract shape. awk-style field splitting to figure out *why*, so the
+  // two malformed cases (invalid STATUS vs. missing TAG) keep their existing, distinct prose.
   const fields = vline.trim().split(/\s+/);
   const status = fields[1] ?? "";
-  const tag = fields[2] ?? "";
-  const proseMatch = vline.match(PROSE_PATTERN);
-  const prose = proseMatch ? (proseMatch[1] ?? "") : vline;
-
   if (!isVerdictStatus(status)) {
     return { status: "FAIL", tag: "BAD_VERDICT", prose: `unparseable verdict: ${vline}` };
   }
+
+  const tag = fields[2] ?? "";
   if (tag === "" || tag === "—") {
     return { status: "FAIL", tag: "BAD_VERDICT", prose: `malformed verdict (missing tag): ${vline}` };
   }
-  return { status, tag, prose };
+
+  // Valid STATUS, non-empty tag, but the line still didn't match the full grammar — the TAG
+  // fails `^[A-Z][A-Z0-9_]{1,23}$` (lowercase, wrong length, leading digit, ...) or the
+  // separator isn't exactly " — ". Malformed — reuse the same FAIL/BAD_VERDICT shape as an
+  // invalid STATUS so both malformed cases are consistent.
+  return { status: "FAIL", tag: "BAD_VERDICT", prose: `unparseable verdict: ${vline}` };
 }
 
 // bash: `: "${SMON_PROBE_TIMEOUT:=120}"` — seconds; defense against a hung probe.

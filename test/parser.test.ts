@@ -1,9 +1,10 @@
 // Task 8 — verdict parser + probe runner.
 //
-// parseVerdict is tested against the bash `parse_verdict` reference
-// (~/Development/small-model-skills/monitor/bin/smon) case-for-case, including its known
-// quirks (see runner.ts's comments) — parity with bash is the point, since Task 12's sweep
-// loop will be validated against a 33-case oracle ported from that same bash function.
+// parseVerdict is tested against the published contract (verdict-contract.md), not against the
+// bash `parse_verdict` reference's bugs. smon deliberately diverges from bash on two points
+// (see runner.ts's VERDICT_LINE_PATTERN comment): digits are legal in TAG (both for parsing and
+// for prose extraction), and a TAG that doesn't match the grammar `^[A-Z][A-Z0-9_]{1,23}$` is
+// rejected as malformed rather than accepted verbatim.
 //
 // runProbe is tested against throwaway fixture scripts under a temp `binDir`, never the real
 // small-model-skills probes — they're actually installed on this host's PATH (verified via
@@ -98,16 +99,48 @@ describe("parseVerdict", () => {
     });
   });
 
-  test("surprising bash quirk: a digit in TAG breaks prose extraction (mirrored deliberately)", () => {
-    // The contract's tag grammar (^[A-Z][A-Z0-9_]{1,23}$) permits digits, but bash's own prose
-    // sed pattern (`[A-Z_]*`, no digits) can't match through a digit, so sed's substitution
-    // fails and the whole raw line falls through as "prose" instead of just the text after the
-    // em dash. This is a genuine bug in the bash reference, reproduced here for parity.
-    const line = "verdict: OK AB12 — hello world";
-    expect(parseVerdict(line)).toEqual({
+  test("a digit in TAG parses correctly (deliberate divergence from a bash bug)", () => {
+    // The contract's tag grammar (^[A-Z][A-Z0-9_]{1,23}$) permits digits. Bash's own prose sed
+    // pattern (`[A-Z_]*`, no digits) can't match through a digit, so its substitution fails and
+    // the whole raw line falls through as "prose" instead of just the text after the em dash —
+    // a genuine bug in the bash reference. smon fixes it: prose is correctly extracted.
+    expect(parseVerdict("verdict: OK DISK90 — 90% full")).toEqual({
       status: "OK",
-      tag: "AB12",
-      prose: line, // NOT "hello world" — matches the bash bug.
+      tag: "DISK90",
+      prose: "90% full",
+    });
+  });
+
+  test("a lowercase/garbage TAG is malformed FAIL/BAD_VERDICT, not accepted verbatim", () => {
+    // Bash accepts any non-empty, non-em-dash tag verbatim, with no grammar validation. smon
+    // enforces the published grammar instead — a lowercase tag is malformed, not "foo".
+    const line = "verdict: OK foo — x";
+    expect(parseVerdict(line)).toEqual({
+      status: "FAIL",
+      tag: "BAD_VERDICT",
+      prose: `unparseable verdict: ${line}`,
+    });
+  });
+
+  test("a single-character TAG is malformed — grammar requires 2-24 chars", () => {
+    const line = "verdict: OK A — x";
+    expect(parseVerdict(line)).toEqual({
+      status: "FAIL",
+      tag: "BAD_VERDICT",
+      prose: `unparseable verdict: ${line}`,
+    });
+  });
+
+  test("a valid 2-character TAG parses fine", () => {
+    expect(parseVerdict("verdict: OK OK — x")).toEqual({
+      status: "OK",
+      tag: "OK",
+      prose: "x",
+    });
+    expect(parseVerdict("verdict: WARN HI — x")).toEqual({
+      status: "WARN",
+      tag: "HI",
+      prose: "x",
     });
   });
 
