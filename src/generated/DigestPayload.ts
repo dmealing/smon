@@ -8,7 +8,7 @@ import { Transition, TransitionInsertSchema } from "./Transition";
 export interface DigestPayload {
   host: string;
   date: string;
-  worstStatus: string;
+  worstStatus: DigestPayloadWorstStatus;
   allOk: boolean;
   okCount: number;
   warnCount: number;
@@ -16,10 +16,11 @@ export interface DigestPayload {
   probes: ProbeState[];
   transitions24h: Transition[];
 }
+export type DigestPayloadWorstStatus = "OK" | "WARN" | "FAIL";
 export const DigestPayloadInsertSchema = z.object({
   host: z.string().min(1),
   date: z.string().min(1),
-  worstStatus: z.string().min(1),
+  worstStatus: z.enum(["OK", "WARN", "FAIL"]),
   allOk: z.boolean(),
   okCount: z.number().int(),
   warnCount: z.number().int(),

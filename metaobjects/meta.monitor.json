@@ -43,7 +43,7 @@
             { "field.string": { "name": "host", "@required": true } },
             { "field.string": { "name": "probe", "@required": true } },
             { "field.object": { "name": "verdict", "@objectRef": "Verdict", "@required": true } },
-            { "field.string": { "name": "kind", "@required": true } },
+            { "field.enum": { "name": "kind", "@required": true, "@values": ["fail", "warn", "recovery"] } },
             { "field.string": { "name": "enrichedBody", "@required": true } }
           ]
         }
@@ -54,7 +54,7 @@
           "children": [
             { "field.string": { "name": "host", "@required": true } },
             { "field.string": { "name": "date", "@required": true } },
-            { "field.string": { "name": "worstStatus", "@required": true } },
+            { "field.enum": { "name": "worstStatus", "@required": true, "@values": ["OK", "WARN", "FAIL"] } },
             { "field.boolean": { "name": "allOk", "@required": true } },
             { "field.int": { "name": "okCount", "@required": true } },
             { "field.int": { "name": "warnCount", "@required": true } },

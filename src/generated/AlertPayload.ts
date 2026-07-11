@@ -8,13 +8,14 @@ export interface AlertPayload {
   host: string;
   probe: string;
   verdict: Verdict;
-  kind: string;
+  kind: AlertPayloadKind;
   enrichedBody: string;
 }
+export type AlertPayloadKind = "fail" | "warn" | "recovery";
 export const AlertPayloadInsertSchema = z.object({
   host: z.string().min(1),
   probe: z.string().min(1),
   verdict: VerdictInsertSchema,
-  kind: z.string().min(1),
+  kind: z.enum(["fail", "warn", "recovery"]),
   enrichedBody: z.string().min(1),
 });
