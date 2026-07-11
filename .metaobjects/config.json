@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "pending_in_git": true,
+  "confidence_thresholds": {
+    "pending_promote": 0.8,
+    "drift_warn": 0.7
+  },
+  "sources": [],
+  "extract": {}
+}

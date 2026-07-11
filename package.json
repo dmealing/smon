@@ -1,0 +1,24 @@
+{
+  "name": "smon",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "gen": "meta gen",
+    "verify": "meta verify",
+    "test": "bun test",
+    "build": "bun build src/cli.ts --target=node --outfile dist/smon.js"
+  },
+  "devDependencies": {
+    "@metaobjectsdev/cli": "0.15.18",
+    "@metaobjectsdev/codegen-ts": "0.15.18",
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@metaobjectsdev/metadata": "0.15.18",
+    "@metaobjectsdev/runtime-ts": "0.15.18"
+  }
+}

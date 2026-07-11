@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "generatedBy": "0.15.18",
+  "servers": [
+    "typescript"
+  ],
+  "clients": [],
+  "files": {
+    ".claude/skills/metaobjects-audit/SKILL.md": "e2ab18b2564a6c57ec8f6cf2f359817c88bff9aa6e593aeddc4121aeb3534c65",
+    ".claude/skills/metaobjects-audit/references/capability-checklist.md": "1097c98de4b6dfdcaca36485a10333afeddc98e90f1e5fef3c3c6389b034ca90",
+    ".claude/skills/metaobjects-audit/references/typescript.md": "581cfd0007e98fa84a1f5ea263de8de316a375831644705ffc6bf72f3bb80ff3",
+    ".claude/skills/metaobjects-authoring/SKILL.md": "219c733a98e3b1981e125fbdce7256b2549ee3f9dee190ee2e10ff1faed23424",
+    ".claude/skills/metaobjects-codegen/SKILL.md": "c01ed4fe6bb9c1db2691f2ae3e51a1d6739a6d92a351b9a05fb4cae412c20e55",
+    ".claude/skills/metaobjects-codegen/references/typescript.md": "6727154662a0ea1a5d56d7503ba4350df63e53c27922b15305fb1e64c095c074",
+    ".claude/skills/metaobjects-prompts/SKILL.md": "47ccdf4b37ada84473903f573d22a00fc62c5893a17a7c3192f61d7fa6af478f",
+    ".claude/skills/metaobjects-prompts/references/typescript.md": "708ea261491b357bd7db2e46ff5eacbf2bfb24c76a72b2e41d9547376d7013df",
+    ".claude/skills/metaobjects-runtime-ui/SKILL.md": "2c7302dd21b771f1df0fa1f8cd28747d7df9a192beff0b37f1d342e0a744e1f0",
+    ".claude/skills/metaobjects-runtime-ui/references/typescript.md": "024a2e4845b2b65529f92fda6c6e6d37c0d7026ef85396efab61bc7fb1f1c306",
+    ".claude/skills/metaobjects-verify/SKILL.md": "55d21ca5f954b6c6ce254a8e9496b35ec870bf0e2536982e1f12477458884e18",
+    ".claude/skills/metaobjects-verify/references/migration.md": "f5e2b24f8fbdf68ad1ff08d9c1d9f32b772a0209430ae51e9077b5f21292fac5",
+    ".metaobjects/AGENTS.md": "0b600d9f114edcfa41ac992ac0372d66eab025a787ffd3d0e36b20806ac48776",
+    ".metaobjects/CLAUDE.md": "0b600d9f114edcfa41ac992ac0372d66eab025a787ffd3d0e36b20806ac48776"
+  }
+}

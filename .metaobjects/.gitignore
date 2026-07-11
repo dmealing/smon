@@ -1,0 +1,11 @@
+.gen-state/
+
+# Per-target codegen output routed under .metaobjects/<target>/ is regenerable
+# (re-run `meta gen`); never commit it. The canonical output is your configured
+# outDir, not this shadow.
+*/src/generated/
+
+# These ARE meant to be tracked — keep them even if a broad pattern matches.
+!migrations/
+!config.json
+!package.meta.json
