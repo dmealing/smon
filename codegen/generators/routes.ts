@@ -16,7 +16,7 @@
 //                own handlers (auth, side effects).
 // composes-with: entity.ts (imports the table/schemas/allowlists), queries.ts.
 
-import { type MetaObject } from "@metaobjectsdev/metadata";
+import { OBJECT_SUBTYPE_VALUE, type MetaObject } from "@metaobjectsdev/metadata";
 import {
   perEntity,
   type Generator,
@@ -33,15 +33,25 @@ export interface RoutesFileOpts {
   target?: string;
 }
 
+// value objects have no source.rdb / identity — mounting CRUD routes over one would
+// import a Drizzle table + Update/Filter/Sort schemas the entity module never emits
+// (renderValueObjectFile only emits the interface + Insert schema). Skip them here,
+// mirroring queries.ts's skipNonQueryable — the reference template omitted this check.
+const skipValueObjects = (e: MetaObject): boolean => e.subType !== OBJECT_SUBTYPE_VALUE;
+
 export const routesFile = function routesFile(opts?: RoutesFileOpts): Generator {
   const userFilter = opts?.filter ?? (() => true);
   const generator: Generator = {
     name: "routes-file",
     // per-entity opt-out via `@emitRoutes: false`; TPH subtypes get no standalone routes
-    // file (their routes live in the discriminator base's); AND-composed with your filter.
+    // file (their routes live in the discriminator base's); value objects are never
+    // routable; AND-composed with your filter.
     filter: (e: MetaObject) =>
       // ADR-0039: resolving — a concrete entity may inherit its @emit* opt-out flag via extends.
-      e.attr(CODEGEN_ATTR_EMIT_ROUTES) !== false && !isTphSubtype(e) && userFilter(e),
+      e.attr(CODEGEN_ATTR_EMIT_ROUTES) !== false &&
+      !isTphSubtype(e) &&
+      skipValueObjects(e) &&
+      userFilter(e),
     generate: perEntity(async (entity, ctx) => {
       if (!ctx.renderContext) {
         throw new Error("routes-file: renderContext is required (provided by runGen)");

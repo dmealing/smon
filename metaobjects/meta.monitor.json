@@ -1,0 +1,69 @@
+{
+  "metadata.root": {
+    "package": "smon",
+    "children": [
+      {
+        "object.value": {
+          "name": "Verdict",
+          "children": [
+            { "field.enum": { "name": "status", "@required": true, "@values": ["OK", "WARN", "FAIL"] } },
+            { "field.string": { "name": "tag", "@required": true } },
+            { "field.string": { "name": "prose", "@required": true } }
+          ]
+        }
+      },
+      {
+        "object.value": {
+          "name": "ProbeState",
+          "children": [
+            { "field.string": { "name": "probe", "@required": true } },
+            { "field.object": { "name": "verdict", "@objectRef": "Verdict", "@required": true } },
+            { "field.string": { "name": "since", "@required": true } },
+            { "field.int": { "name": "sweepCount", "@required": true } },
+            { "field.boolean": { "name": "alerted", "@required": true } }
+          ]
+        }
+      },
+      {
+        "object.value": {
+          "name": "Transition",
+          "children": [
+            { "field.string": { "name": "time", "@required": true } },
+            { "field.string": { "name": "probe", "@required": true } },
+            { "field.string": { "name": "fromKey", "@required": true } },
+            { "field.string": { "name": "toKey", "@required": true } },
+            { "field.enum": { "name": "kind", "@required": true, "@values": ["fail", "warn", "recovery"] } }
+          ]
+        }
+      },
+      {
+        "object.value": {
+          "name": "AlertPayload",
+          "children": [
+            { "field.string": { "name": "host", "@required": true } },
+            { "field.string": { "name": "probe", "@required": true } },
+            { "field.object": { "name": "verdict", "@objectRef": "Verdict", "@required": true } },
+            { "field.string": { "name": "kind", "@required": true } },
+            { "field.string": { "name": "enrichedBody", "@required": true } }
+          ]
+        }
+      },
+      {
+        "object.value": {
+          "name": "DigestPayload",
+          "children": [
+            { "field.string": { "name": "host", "@required": true } },
+            { "field.string": { "name": "date", "@required": true } },
+            { "field.string": { "name": "worstStatus", "@required": true } },
+            { "field.boolean": { "name": "allOk", "@required": true } },
+            { "field.int": { "name": "okCount", "@required": true } },
+            { "field.int": { "name": "warnCount", "@required": true } },
+            { "field.int": { "name": "failCount", "@required": true } },
+            { "field.object": { "name": "probes", "@objectRef": "ProbeState", "isArray": true, "@storage": "jsonb", "@required": true } },
+            { "field.object": { "name": "transitions24h", "@objectRef": "Transition", "isArray": true, "@storage": "jsonb", "@required": true } }
+          ]
+        }
+      }
+    ]
+  }
+}
