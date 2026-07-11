@@ -1,0 +1,17 @@
+smon daily digest — {{host}} — {{date}}
+Worst status: {{worstStatus}}
+{{okCount}} OK / {{warnCount}} WARN / {{failCount}} FAIL
+{{#allOk}}All probes healthy.{{/allOk}}
+
+Probes:
+{{#probes}}
+- {{probe}}: {{verdict.status}} ({{verdict.tag}}) — {{verdict.prose}}
+{{/probes}}
+
+Transitions (24h):
+{{#transitions24h}}
+- {{time}} {{probe}}: {{fromKey}} -> {{toKey}} ({{kind}})
+{{/transitions24h}}
+{{^transitions24h}}
+- none
+{{/transitions24h}}

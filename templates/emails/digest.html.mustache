@@ -1,0 +1,6 @@
+<style>.hdr{font-family:sans-serif;padding:12px 16px;border-radius:6px;color:#fff}.hdr-OK{background:#1a7f37}.hdr-WARN{background:#b35900}.hdr-FAIL{background:#b3261e}table{border-collapse:collapse;margin-top:12px}td,th{border:1px solid #ccc;padding:4px 8px;text-align:left}</style>
+<div class="hdr hdr-{{worstStatus}}"><h1 style="margin:0">smon daily digest — {{host}}</h1><p style="margin:4px 0 0">{{date}} · worst status: {{worstStatus}}</p></div>
+<p>{{okCount}} OK / {{warnCount}} WARN / {{failCount}} FAIL{{#allOk}} — all probes healthy{{/allOk}}</p>
+<table><tr><th>Probe</th><th>Status</th><th>Tag</th><th>Prose</th></tr>{{#probes}}<tr><td>{{probe}}</td><td>{{verdict.status}}</td><td>{{verdict.tag}}</td><td>{{verdict.prose}}</td></tr>{{/probes}}</table>
+<h2>Transitions (24h)</h2>
+<ul>{{#transitions24h}}<li>{{time}} {{probe}}: {{fromKey}} &rarr; {{toKey}} ({{kind}})</li>{{/transitions24h}}{{^transitions24h}}<li>none</li>{{/transitions24h}}</ul>

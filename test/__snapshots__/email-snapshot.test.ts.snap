@@ -1,0 +1,10 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`digest email renders byte-stable HTML 1`] = `
+"<style>.hdr{font-family:sans-serif;padding:12px 16px;border-radius:6px;color:#fff}.hdr-OK{background:#1a7f37}.hdr-WARN{background:#b35900}.hdr-FAIL{background:#b3261e}table{border-collapse:collapse;margin-top:12px}td,th{border:1px solid #ccc;padding:4px 8px;text-align:left}</style>
+<div class="hdr hdr-WARN"><h1 style="margin:0">smon daily digest — example-host</h1><p style="margin:4px 0 0">2026-01-01 · worst status: WARN</p></div>
+<p>3 OK / 1 WARN / 0 FAIL</p>
+<table><tr><th>Probe</th><th>Status</th><th>Tag</th><th>Prose</th></tr><tr><td>disk-report</td><td>WARN</td><td>DISK_HIGH</td><td>88%</td></tr></table>
+<h2>Transitions (24h)</h2>
+<ul><li>none</li></ul>"
+`;

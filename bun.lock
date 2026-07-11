@@ -6,6 +6,7 @@
       "name": "smon",
       "dependencies": {
         "@metaobjectsdev/metadata": "0.15.18",
+        "@metaobjectsdev/render": "0.15.18",
         "@metaobjectsdev/runtime-ts": "0.15.18",
       },
       "devDependencies": {

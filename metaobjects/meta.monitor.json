@@ -63,6 +63,35 @@
             { "field.object": { "name": "transitions24h", "@objectRef": "Transition", "isArray": true, "@storage": "jsonb", "@required": true } }
           ]
         }
+      },
+      {
+        "template.prompt": {
+          "name": "EnrichmentPrompt",
+          "@payloadRef": "ProbeState",
+          "@textRef": "prompts/enrichment",
+          "@format": "text",
+          "@maxTokens": 300
+        }
+      },
+      {
+        "template.output": {
+          "name": "AlertEmail",
+          "@kind": "email",
+          "@payloadRef": "AlertPayload",
+          "@subjectRef": "emails/alert.subject",
+          "@htmlBodyRef": "emails/alert.html",
+          "@textBodyRef": "emails/alert.txt"
+        }
+      },
+      {
+        "template.output": {
+          "name": "DigestEmail",
+          "@kind": "email",
+          "@payloadRef": "DigestPayload",
+          "@subjectRef": "emails/digest.subject",
+          "@htmlBodyRef": "emails/digest.html",
+          "@textBodyRef": "emails/digest.txt"
+        }
       }
     ]
   }

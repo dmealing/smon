@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "gen": "meta gen",
-    "verify": "meta verify",
+    "verify": "meta verify --prompts templates",
     "test": "bun test",
     "build": "bun build src/cli.ts --target=node --outfile dist/smon.js"
   },
@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@metaobjectsdev/metadata": "0.15.18",
+    "@metaobjectsdev/render": "0.15.18",
     "@metaobjectsdev/runtime-ts": "0.15.18"
   }
 }

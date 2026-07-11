@@ -7,6 +7,10 @@ import { entityFile } from "./codegen/generators/entity";
 import { queriesFile } from "./codegen/generators/queries";
 import { routesFile } from "./codegen/generators/routes";
 import { barrel } from "./codegen/generators/barrel";
+// Stock (non-owned) generators consumed directly from the package — these wrap
+// the render engine for template.prompt / template.output nodes and don't need
+// per-project customization, so they aren't scaffold-and-own like the ones above.
+import { promptRender, renderHelper } from "@metaobjectsdev/codegen-ts/generators";
 
 export default defineConfig({
   outDir:    "src/generated",
@@ -19,6 +23,8 @@ export default defineConfig({
     queriesFile(),
     routesFile(),
     barrel(),
+    promptRender(),
+    renderHelper(),
   ],
   docs: {
     outDir:   "./docs",        // model + api surfaces both land here (run: meta docs)
