@@ -1,0 +1,112 @@
+{
+  "metadata.root": {
+    "package": "smon",
+    "children": [
+      {
+        "object.value": {
+          "name": "HeartbeatPayload",
+          "children": [
+            { "field.enum": { "name": "status", "@required": true, "@values": ["up", "down"] } },
+            { "field.string": { "name": "msg", "@required": true } },
+            { "field.int": { "name": "pingMs", "@required": true } }
+          ]
+        }
+      },
+      {
+        "adapter.notify": {
+          "name": "HaPush",
+          "@kind": "push",
+          "@payloadRef": "AlertPayload",
+          "@digestPayloadRef": "DigestPayload",
+          "@requiredConfig": ["SMON_HA_URL", "SMON_HA_TOKEN", "SMON_HA_DEVICE"]
+        }
+      },
+      {
+        "adapter.notify": {
+          "name": "Kuma",
+          "@kind": "heartbeat",
+          "@payloadRef": "HeartbeatPayload",
+          "@requiredConfig": ["SMON_KUMA_PUSH_URL"]
+        }
+      },
+      {
+        "adapter.notify": {
+          "name": "Matrix",
+          "@kind": "chat",
+          "@payloadRef": "AlertPayload",
+          "@digestPayloadRef": "DigestPayload",
+          "@requiredConfig": ["SMON_MATRIX_HOMESERVER", "SMON_MATRIX_TOKEN", "SMON_MATRIX_ROOM"]
+        }
+      },
+      {
+        "adapter.notify": {
+          "name": "Email",
+          "@kind": "email",
+          "@payloadRef": "AlertPayload",
+          "@digestPayloadRef": "DigestPayload",
+          "@alertTemplateRef": "AlertEmail",
+          "@digestTemplateRef": "DigestEmail",
+          "@requiredConfig": ["SMON_EMAIL_TO"],
+          "@optionalConfig": ["SMON_SMTP_CMD"]
+        }
+      },
+      {
+        "adapter.notify": {
+          "name": "Stdout",
+          "@kind": "stdout",
+          "@payloadRef": "AlertPayload",
+          "@digestPayloadRef": "DigestPayload"
+        }
+      },
+      {
+        "probe.bash": {
+          "name": "SysDiag",
+          "@script": "sys-diag",
+          "@tags": ["CPU_HOG", "HIGH_LOAD", "MEMORY_PRESSURE", "THERMAL", "NOMINAL", "PROBE_FAILED"]
+        }
+      },
+      {
+        "probe.bash": {
+          "name": "DiskReport",
+          "@script": "disk-report",
+          "@tags": ["DISK_CRITICAL", "DISK_HIGH", "NOMINAL", "PROBE_FAILED"]
+        }
+      },
+      {
+        "probe.bash": {
+          "name": "SmartHealth",
+          "@script": "smart-health",
+          "@tags": ["DRIVE_AGING", "DRIVE_FAILING", "NOMINAL", "PROBE_FAILED"]
+        }
+      },
+      {
+        "probe.bash": {
+          "name": "LogTriage",
+          "@script": "log-triage",
+          "@tags": ["FAILED_SERVICES", "LOG_ERRORS", "NOMINAL"]
+        }
+      },
+      {
+        "probe.bash": {
+          "name": "RunawayHunter",
+          "@script": "runaway-hunter",
+          "@tags": ["KNOWN_OFFENDER", "NOMINAL", "PROBE_FAILED", "RUNAWAY", "WEDGED"]
+        }
+      },
+      {
+        "probe.bash": {
+          "name": "DockerHygiene",
+          "@script": "docker-hygiene",
+          "@tags": ["CLEAN", "DAEMON_DOWN", "NO_DOCKER", "RECLAIMABLE"]
+        }
+      },
+      {
+        "probe.bash": {
+          "name": "OllamaDoctor",
+          "@script": "ollama-doctor",
+          "@tags": ["CPU_SPILL", "DAEMON_DOWN", "HEALTHY", "LIMITED", "NO_MODELS", "PROBE_FAILED"]
+        }
+      }
+    ]
+  }
+}
