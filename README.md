@@ -1,4 +1,4 @@
-# smon
+# smon — the Smart Monitor
 
 [![CI](https://github.com/dmealing/smon/actions/workflows/ci.yml/badge.svg)](https://github.com/dmealing/smon/actions/workflows/ci.yml)
 [![Built with MetaObjects](https://img.shields.io/badge/Built%20with-MetaObjects-D4AF37)](https://metaobjects.dev)
