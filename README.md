@@ -1,12 +1,16 @@
 # smon
 
 [![CI](https://github.com/dmealing/smon/actions/workflows/ci.yml/badge.svg)](https://github.com/dmealing/smon/actions/workflows/ci.yml)
+[![Built with MetaObjects](https://img.shields.io/badge/Built%20with-MetaObjects-D4AF37)](https://metaobjects.dev)
 
 `smon` is a system monitor rewritten from a collection of bash scripts into a typed
 TypeScript project. Its domain model — probes, verdicts, alert payloads, email
 templates, and notification adapters — is declared as typed metadata using the
 [MetaObjects](https://github.com/metaobjectsdev) toolchain, and the runtime code
 (schemas, types, generated glue) is generated from that model rather than hand-written.
+
+> **Featured as a MetaObjects reference project** — read the honest before/after case
+> study at [metaobjects.com/case-studies/smon](https://www.metaobjects.com/case-studies/smon/).
 
 ## Why metadata-first
 

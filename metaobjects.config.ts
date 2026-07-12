@@ -4,8 +4,6 @@ import { defineConfig } from "@metaobjectsdev/cli";
 // `meta gen` runs from these local copies, not from the package. Read each file's
 // header doc-block for what it emits and how to customize it.
 import { entityFile } from "./codegen/generators/entity";
-import { queriesFile } from "./codegen/generators/queries";
-import { routesFile } from "./codegen/generators/routes";
 import { barrel } from "./codegen/generators/barrel";
 // Stock (non-owned) generators consumed directly from the package — these wrap
 // the render engine for template.prompt / template.output nodes and don't need
@@ -24,14 +22,14 @@ import { monitorDocs } from "./codegen/generators/monitor-docs";
 export default defineConfig({
   outDir:    "src/generated",
   extStyle:  "none",
+  // dbImport/dialect are required by MetaobjectsGenConfig even though smon declares only value
+  // objects (no write-through entities), so no DB code is generated and these go unused. Kept to
+  // satisfy the type; the routes/queries generators + apiPrefix that WOULD consume them are removed.
   dbImport:  "../db",
   dialect:   "sqlite",
-  apiPrefix: "",     // set to "/api" if your routes mount under /api
   providers: [smonMonitorTypes],
   generators: [
     entityFile(),
-    queriesFile(),
-    routesFile(),
     barrel(),
     promptRender(),
     renderHelper(),

@@ -66,9 +66,17 @@
         }
       },
       {
+        "object.value": {
+          "name": "EnrichmentInput",
+          "children": [
+            { "field.string": { "name": "digest", "@required": true } }
+          ]
+        }
+      },
+      {
         "template.prompt": {
           "name": "EnrichmentPrompt",
-          "@payloadRef": "ProbeState",
+          "@payloadRef": "EnrichmentInput",
           "@textRef": "prompts/enrichment",
           "@format": "text",
           "@maxTokens": 300

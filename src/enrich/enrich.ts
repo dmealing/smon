@@ -4,16 +4,13 @@
 // timeout) falls back to the raw `prose` unchanged. Mirrors bash's `enrich()`
 // (small-model-skills monitor/bin/smon).
 //
-// Prompt text — why this doesn't use the metaobjects EnrichmentPrompt template: Task 4's
-// `EnrichmentPrompt` (templates/prompts/enrichment.mustache, rendered via
-// `renderEnrichmentPrompt` in src/generated/prompts.ts) is declared against a `ProbeState`
-// payload (probe/verdict.status/verdict.tag/verdict.prose/since/sweepCount/alerted) — richer
-// than what `enrich()` receives here (just `digest` + `prose`, matching bash's own two-arg
-// `enrich(digest, prose)`). The template has no placeholder for the raw digest text at all, so
-// rendering it from this two-string signature would mean either inventing the missing ProbeState
-// fields or losing the digest entirely — forcing a fit that doesn't exist. `buildPrompt` below
-// therefore reproduces bash's fixed prompt text verbatim instead; the metaobjects template stays
-// available (unused by this file) for a future caller that actually holds a full ProbeState.
+// Prompt text — rendered from the metaobjects `EnrichmentPrompt` template
+// (templates/prompts/enrichment.mustache) via the generated `renderEnrichmentPrompt`
+// (src/generated/prompts.ts) and the shared filesystem `templatesProvider` (src/render/provider.ts).
+// The template's payload — `EnrichmentInput { digest }` — matches exactly what `enrich()` holds (the
+// raw probe `digest`), so the prompt text lives in the model, payload-checked by `meta gen`/`meta
+// verify`, instead of being hard-coded here. `prose` stays the fallback returned on ANY engine
+// failure and is never part of the prompt (mirroring bash's two-arg `enrich(digest, prose)`).
 //
 // Timeout safety (non-negotiable): a prior `runProbe` bug (src/probes/runner.ts, task-8) spawned
 // a subprocess with a SIGTERM-only timeout that hung forever when the child ignored SIGTERM,
@@ -28,6 +25,8 @@
 // helper would mean forcing both shapes through a common interface for little real gain.
 
 import { optionalConfig } from "../notify/config";
+import { renderEnrichmentPrompt } from "../generated/prompts";
+import { templatesProvider } from "../render/provider";
 
 const ZAI_BASE_URL = "https://api.z.ai/api/anthropic";
 const ZAI_MODEL = "glm-5.2";
@@ -142,16 +141,6 @@ async function runWithTimeout(proc: EnrichProc, timeoutMs: number, killGraceMs: 
   return { kind: "timeout" };
 }
 
-function buildPrompt(digest: string): string {
-  // Fixed prompt text — see the file header for why this isn't the metaobjects EnrichmentPrompt
-  // template. Verbatim match of bash's `enrich()` prompt.
-  return (
-    "You are a terse sysadmin assistant. Given this diagnostic output, reply in at most 2 " +
-    "sentences: what the problem means and the single first thing to check. No preamble.\n\n" +
-    digest
-  );
-}
-
 /**
  * Enriches a terse verdict `prose` into a short, actionable message via a cheap LLM, given the
  * probe's raw `digest` output. GARNISH ONLY: any failure (bad/missing config, spawn error,
@@ -200,7 +189,7 @@ export async function enrich(
   }
 
   const claudeBin = optionalConfig(cfg, "SMON_CLAUDE_BIN", "claude");
-  const command = [claudeBin, "-p", buildPrompt(digest), "--output-format", "json"];
+  const command = [claudeBin, "-p", renderEnrichmentPrompt({ digest }, templatesProvider), "--output-format", "json"];
 
   const spawn = deps.spawn ?? defaultSpawn;
   const timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;

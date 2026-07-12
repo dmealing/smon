@@ -49,6 +49,10 @@ export interface DigestPayload {
   transitions24h: Transition[];
 }
 
+export interface EnrichmentInput {
+  digest: string;
+}
+
 export type HeartbeatPayloadStatus = "up" | "down";
 export interface HeartbeatPayload {
   status: HeartbeatPayloadStatus;
@@ -56,6 +60,6 @@ export interface HeartbeatPayload {
   pingMs: number;
 }
 
-export function renderEnrichmentPrompt(payload: ProbeState, provider: Provider): string {
+export function renderEnrichmentPrompt(payload: EnrichmentInput, provider: Provider): string {
   return render({ ref: "prompts/enrichment", payload, format: "text", provider });
 }
