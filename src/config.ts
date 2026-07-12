@@ -1,5 +1,5 @@
 // env -> typed Config (SMON_* knobs), mirroring the config block at the top of
-// ~/Development/small-model-skills/monitor/bin/smon (lines ~35-55). Every knob gets the same
+// the bash reference (small-model-skills monitor/bin/smon, lines ~35-55). Every knob gets the same
 // default bash applies via `: "${VAR:=default}"` (undefined OR empty string -> default, which is
 // exactly src/notify/config.ts's optionalConfig rule -- reused below rather than reimplemented).
 //

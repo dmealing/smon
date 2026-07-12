@@ -1,7 +1,7 @@
 // email notify adapter — Task 9. Renders the templated email (Task 4's `renderEmail`,
 // src/render/email.ts) and pipes a MIME message to a sendmail-compatible command.
 //
-// NOT a bash port — ~/Development/small-model-skills/monitor/bin/smon has no email notify
+// NOT a bash port — the bash reference (small-model-skills monitor/bin/smon) has no email notify
 // backend at all (grep for msmtp/smtp/mail across small-model-skills turns up nothing; email
 // is new to the metaobjects model, see the Email adapter.notify node in
 // metaobjects/meta.notify.json with @alertTemplateRef/@digestTemplateRef). The shape below is

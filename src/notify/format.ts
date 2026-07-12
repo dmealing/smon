@@ -1,7 +1,7 @@
 // Hand-written (not codegen) — shared plain-text formatting for the non-email notify
 // adapters (ha-push, matrix, stdout). Mirrors the title/body shapes the bash reference
 // composed in `eval_probe`/`maybe_digest` before handing them to `notify_send`/`_notify_one`
-// (~/Development/small-model-skills/monitor/bin/smon). The TS port moved title/body
+// (the bash reference — small-model-skills monitor/bin/smon). The TS port moved title/body
 // composition INTO each adapter (AlertPayload/DigestPayload carry no separate title/body
 // fields — see src/generated/AlertPayload.ts, DigestPayload.ts), so this module is the one
 // place that logic lives, shared by every adapter that needs plain-text framing.
@@ -23,11 +23,16 @@ const ALERT_KIND_EMOJI: Record<AlertPayload["kind"], string> = {
  *   fail:     title="🔴 $SMON_HOST: $V_TAG"
  *   warn:     title="🟠 $SMON_HOST: $V_TAG"
  *   recovery: title="🟢 $SMON_HOST: $probe recovered ($p_tag → OK)"
+ *
+ * `$p_tag` is the tag of the FAILING/WARNING state being recovered FROM — carried in
+ * `payload.fromTag` (set at the CLI from `decision.alert.fromKey`) — NOT
+ * `payload.verdict.tag`, which on a recovery event is already the new OK verdict's tag
+ * ("NOMINAL") and would render the meaningless "recovered (NOMINAL → OK)".
  */
 export function formatAlertTitle(payload: AlertPayload): string {
   const emoji = ALERT_KIND_EMOJI[payload.kind];
   if (payload.kind === "recovery") {
-    return `${emoji} ${payload.host}: ${payload.probe} recovered (${payload.verdict.tag} → OK)`;
+    return `${emoji} ${payload.host}: ${payload.probe} recovered (${payload.fromTag ?? payload.verdict.tag} → OK)`;
   }
   return `${emoji} ${payload.host}: ${payload.verdict.tag}`;
 }

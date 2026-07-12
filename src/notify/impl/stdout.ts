@@ -1,6 +1,6 @@
 // stdout notify adapter — Task 9. Always succeeds; prints the alert/digest for local/dry-run
 // visibility. Ports bash `_notify_one`'s stdout case
-// (~/Development/small-model-skills/monitor/bin/smon):
+// (small-model-skills monitor/bin/smon):
 //   stdout) printf '[smon %s] %s\n  %s\n' "$status" "$title" "$body"; return 0 ;;
 // and `maybe_digest`'s DRY_RUN print for the digest shape. `@requiredConfig`/`@optionalConfig`
 // are both empty (see metaobjects/meta.notify.json's Stdout node) — cfg is unused.

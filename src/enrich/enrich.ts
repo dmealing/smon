@@ -1,8 +1,8 @@
 // Turns a terse probe verdict into a short, actionable message via a cheap LLM. Enrichment is
 // GARNISH: it must never break or hang the alert path. SMON_BRAIN=none skips the model call
 // entirely; any other engine failure (spawn error, non-zero exit, empty/unparseable output,
-// timeout) falls back to the raw `prose` unchanged. Mirrors bash's `enrich()`:
-//   ~/Development/small-model-skills/monitor/bin/smon
+// timeout) falls back to the raw `prose` unchanged. Mirrors bash's `enrich()`
+// (small-model-skills monitor/bin/smon).
 //
 // Prompt text — why this doesn't use the metaobjects EnrichmentPrompt template: Task 4's
 // `EnrichmentPrompt` (templates/prompts/enrichment.mustache, rendered via

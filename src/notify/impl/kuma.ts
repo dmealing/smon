@@ -1,5 +1,5 @@
 // kuma notify adapter — Task 9. GETs an Uptime Kuma push-monitor URL. Ports bash `heartbeat`
-// (~/Development/small-model-skills/monitor/bin/smon):
+// (small-model-skills monitor/bin/smon):
 //
 //   [ -n "$SMON_KUMA_PUSH_URL" ] || return 0    # not configured -> silent no-op, not a failure
 //   curl "${SMON_KUMA_PUSH_URL}?status=up&msg=$(printf '%s' "$msg" | jq -sRr @uri)"

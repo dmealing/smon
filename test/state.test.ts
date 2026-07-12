@@ -1,6 +1,6 @@
 // Task 11 — per-probe alert-policy state, persisted as JSON. Replaces bash's space-separated
 // `$SMON_STATE_DIR/<probe>.state` file (`read_state`/`write_state` in
-// ~/Development/small-model-skills/monitor/bin/smon): "status tag pending_since sweep_count
+// small-model-skills monitor/bin/smon): "status tag pending_since sweep_count
 // alerted", no prose. Here the same info lives in a typed ProbeState (src/generated/ProbeState.ts):
 // {probe, verdict: {status, tag, prose}, since, sweepCount, alerted}.
 //

@@ -256,7 +256,7 @@ describe("runProbe", () => {
     });
   });
 
-  // Task 8 incident regression (see task-8-report.md): a probe that traps/ignores SIGTERM makes
+  // Task 8 incident regression: a probe that traps/ignores SIGTERM makes
   // `proc.exited` never resolve, so the OLD runProbe (bare SIGTERM, then `await proc.exited`)
   // hung forever — a `bun test` run once pegged a CPU core for ~53 minutes this way. The timeout
   // guard must be unconditional: SIGTERM first, then an escalating SIGKILL backstop, and

@@ -1,5 +1,5 @@
 // Task 10 — LLM enrichment with fallback-to-raw. Mirrors bash `enrich()`
-// (~/Development/small-model-skills/monitor/bin/smon): SMON_BRAIN selects the engine (none/glm/
+// (small-model-skills monitor/bin/smon): SMON_BRAIN selects the engine (none/glm/
 // local); ANY failure (bad config, spawn error, non-zero exit, empty/unparseable output, timeout)
 // falls back to the raw verdict prose — enrich() never throws. The injected `spawn` dependency
 // stands in for the real `claude` binary so these tests need neither network access nor a real

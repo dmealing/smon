@@ -273,6 +273,10 @@ describe("recovery", () => {
     const recovery = shared.alerts.find((a) => a.payload.kind === "recovery");
     expect(recovery).toBeDefined();
     expect(recovery!.payload.verdict.status).toBe("OK");
+    // fromTag threads decision.alert.fromKey ("FAIL/DISK_CRITICAL")'s tag half — the state we
+    // recovered FROM — so notify formatting can render "recovered (DISK_CRITICAL -> OK)" instead
+    // of the meaningless "recovered (NOMINAL -> OK)" (NOMINAL being the new OK verdict's own tag).
+    expect(recovery!.payload.fromTag).toBe("DISK_CRITICAL");
     expect(readStateFile("disk-report").alerted).toBe(false);
   });
 });

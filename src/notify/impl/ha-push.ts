@@ -1,5 +1,5 @@
 // ha-push notify adapter — Task 9. POSTs a Home Assistant `notify.<service>` push. Ports
-// bash `notify_ha` (~/Development/small-model-skills/monitor/bin/smon):
+// bash `notify_ha` (small-model-skills monitor/bin/smon):
 //
 //   url="${SMON_HA_URL%/}/api/services/notify/${SMON_HA_TARGET#notify.}"
 //   curl -X POST "$url" -H "Authorization: Bearer $tok" -H "Content-Type: application/json" \

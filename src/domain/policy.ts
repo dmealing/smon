@@ -1,7 +1,7 @@
 // Task 12 — the pure alert-policy state machine. This is the parity core: a straight port of
 // bash `eval_probe` (the transition/sustain/re-alert/recovery logic) PLUS the quiet-hours gate
 // that in bash lives in the notify layer (`notify_send` + `in_quiet_hours`) but is POLICY, so it
-// moves here. Reference: ~/Development/small-model-skills/monitor/bin/smon.
+// moves here. Reference: the bash reference (small-model-skills monitor/bin/smon).
 //
 // decide() is PURE: no I/O, no wall-clock read, no host data, no enrichment. Everything it needs
 // comes from its arguments — the previous ProbeState, the current Verdict, the timing/threshold

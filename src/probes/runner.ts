@@ -1,8 +1,8 @@
 // The verdict parser + probe runner — the bridge between the small-model-skills bash
-// diagnostic probes and typed Verdicts. Loosely follows the bash reference:
-//   ~/Development/small-model-skills/monitor/bin/smon's `parse_verdict` function and the
-//   probe-exec block of `eval_probe`.
-// Contract: ~/Development/small-model-skills/docs/verdict-contract.md.
+// diagnostic probes and typed Verdicts. Loosely follows the bash reference
+// (small-model-skills monitor/bin/smon)'s `parse_verdict` function and the
+// probe-exec block of `eval_probe`.
+// Contract: small-model-skills docs/verdict-contract.md.
 //
 // Pure TypeScript runtime glue for Task 12's sweep loop — no metaobjects machinery here.
 //
@@ -168,7 +168,7 @@ function delay<T>(ms: number, value: T): { promise: Promise<T>; cancel: () => vo
  * timeout the WHOLE group is signalled, not just the direct child. This matters: a bash-script
  * probe that blocks in a foreground sub-process (e.g. its own `sleep`/`find`/`du`) absorbs a
  * plain SIGTERM sent only to itself but leaves it queued until that sub-process finishes on its
- * own — verified empirically while building this (see task-8-report.md). GNU coreutils
+ * own — verified empirically while building this. GNU coreutils
  * `timeout`, which the bash reference uses, avoids this by killing the whole process group by
  * default; group-killing here reproduces that reliability rather than the bug.
  *
@@ -176,7 +176,7 @@ function delay<T>(ms: number, value: T): { promise: Promise<T>; cancel: () => vo
  * is sent to the group first, but `runProbe` does NOT simply `await proc.exited` afterward — a
  * probe (or a wedged descendant) that ignores/traps SIGTERM, or is stuck uninterruptibly, would
  * leave that promise unsettled forever, hanging `runProbe` and leaking the orphan (this is the
- * exact incident root cause — see task-8-report.md: a `bun test` run once pegged a CPU core for
+ * exact incident root cause: a `bun test` run once pegged a CPU core for
  * ~53 minutes this way). Instead, once the timeout fires, `runProbe` races `proc.exited` against
  * a short `killGraceMs` grace timer; if the process group hasn't exited by then, it sends an
  * unconditional SIGKILL backstop and resolves to PROBE_TIMEOUT regardless of whether/when

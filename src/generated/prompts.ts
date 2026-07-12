@@ -33,6 +33,7 @@ export interface AlertPayload {
   verdict: Verdict;
   kind: AlertPayloadKind;
   enrichedBody: string;
+  fromTag?: string | null;
 }
 
 export type DigestPayloadWorstStatus = "OK" | "WARN" | "FAIL";

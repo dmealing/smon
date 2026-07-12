@@ -1,6 +1,6 @@
 // Per-probe alert-policy state, persisted as JSON -- the TS replacement for bash's
 // space-separated `$SMON_STATE_DIR/<probe>.state` file (`read_state`/`write_state` in
-// ~/Development/small-model-skills/monitor/bin/smon). Consumed by Task 12's decide() and Task
+// the bash reference — small-model-skills monitor/bin/smon). Consumed by Task 12's decide() and Task
 // 13's sweep loop.
 //
 // Bash's on-disk shape is 5 positional fields: "status tag pending_since sweep_count alerted"

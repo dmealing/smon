@@ -1,1 +1,1 @@
-[smon] {{host}} · {{probe}} · {{verdict.status}} ({{verdict.tag}})
+[smon] {{host}} · {{probe}} · {{#fromTag}}recovered ({{fromTag}} → OK){{/fromTag}}{{^fromTag}}{{verdict.status}} ({{verdict.tag}}){{/fromTag}}

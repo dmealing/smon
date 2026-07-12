@@ -1,5 +1,5 @@
 // Task 11 — env -> typed Config, the "silent-typo killer". Mirrors the config block at the top
-// of ~/Development/small-model-skills/monitor/bin/smon (lines ~35-55): every SMON_* knob gets
+// of the bash reference (small-model-skills monitor/bin/smon, lines ~35-55): every SMON_* knob gets
 // the same default bash applies via `: "${VAR:=default}"` (undefined OR empty string -> default,
 // exactly src/notify/config.ts's optionalConfig rule). The one behavior bash does NOT have:
 // SMON_NOTIFY/SMON_PROBES/SMON_FALLBACK_NOTIFY are validated against the real generated closed

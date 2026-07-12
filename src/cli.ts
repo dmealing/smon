@@ -1,7 +1,7 @@
 // smon CLI — the runnable entrypoint that wires every module (Tasks 3–12) into a sweep.
 //
 // This is the integration layer: a faithful TS port of the bash reference's `cli`/sweep
-// (~/Development/small-model-skills/monitor/bin/smon). Per sweep, for each configured probe it
+// (the bash reference — small-model-skills monitor/bin/smon). Per sweep, for each configured probe it
 //   runProbe (src/probes/runner.ts, SIGKILL-escalating timeout — never unbounded)
 //     -> decide (src/domain/policy.ts, the pure alert-policy state machine incl. quiet hours)
 //       -> on an alert: build an AlertPayload, enrich PER POLICY (below), dispatch to each
@@ -10,7 +10,7 @@
 // It closes every sweep with a heartbeat (kuma) so a dead host is itself detectable, then an
 // opt-in daily digest.
 //
-// PARITY NOTES (where this intentionally maps to, or diverges from, bash — see task-13-report.md):
+// PARITY NOTES (where this intentionally maps to, or diverges from, bash):
 //  - Enrich policy (bash eval_probe ~273–280, "don't-enrich-FAIL"): keyed on the alert KIND.
 //    warn -> enrich; fail -> raw prose unless cfg.enrichFail; recovery -> raw prose. enrich()
 //    is garnish: it self-times-out and falls back to prose, and NEVER gates the alert.
@@ -432,7 +432,12 @@ async function runSweep(
     if (decision.alert) {
       const kind = decision.alert.kind;
       const body = await buildAlertBody(cfg, env, deps.enrich, kind, verdict);
-      const payload: AlertPayload = { host: cfg.host, probe, verdict, kind, enrichedBody: body };
+      // fromTag is the tag of the state being recovered FROM (decision.alert.fromKey is
+      // "STATUS/TAG"), used by formatAlertTitle/the email subject template to render
+      // "recovered (<fromTag> -> OK)" instead of the current (OK) verdict's tag. Only
+      // meaningful for a recovery — bash only uses the from-tag in the recovery title.
+      const fromTag = kind === "recovery" ? decision.alert.fromKey.split("/")[1] : undefined;
+      const payload: AlertPayload = { host: cfg.host, probe, verdict, kind, enrichedBody: body, fromTag };
       const notifyStatus = notifyStatusForKind(kind);
 
       if (dryRun) {

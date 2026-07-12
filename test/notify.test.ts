@@ -3,7 +3,7 @@
 // zero real network/SMTP. Public-repo hygiene: all hosts/rooms/emails below are placeholders
 // (ha.example / !room:example.org / to@example.com) — never real infra.
 //
-// Bash reference for the HTTP shapes: ~/Development/small-model-skills/monitor/bin/smon
+// Bash reference for the HTTP shapes: small-model-skills monitor/bin/smon
 // (notify_ha, notify_matrix, heartbeat, _notify_one). See each impl file's header for the
 // specific deviations (config-key renames already fixed by the metaobjects model, and the
 // notify.-prefix strip / colon-only room encoding carried over verbatim from bash).
@@ -33,12 +33,16 @@ const WARN_ALERT: AlertPayload = {
   enrichedBody: "Load has been high for a while.",
 };
 
+// fromTag is what the CLI threads from decision.alert.fromKey ("FAIL/DISK_CRITICAL") for a
+// recovery — the tag of the state being recovered FROM, distinct from verdict.tag (the new OK
+// verdict's tag, always "NOMINAL"). See src/notify/format.ts's formatAlertTitle.
 const RECOVERY_ALERT: AlertPayload = {
   host: "test-host",
   probe: "sys-diag",
   verdict: { status: "OK", tag: "NOMINAL", prose: "back to normal" },
   kind: "recovery",
   enrichedBody: "back to normal",
+  fromTag: "DISK_CRITICAL",
 };
 
 const DIGEST: DigestPayload = {
@@ -94,6 +98,14 @@ describe("stdout adapter", () => {
     expect(lines[1]).toContain("🟠");
     expect(lines[2]).toContain("🟢");
     expect(lines[2]).toContain("recovered");
+  });
+
+  test("recovery title shows the FAILING tag being recovered FROM, not the new OK verdict's tag", async () => {
+    const lines: string[] = [];
+    const adapter = createStdoutAdapter({ write: (line) => lines.push(line) });
+    await adapter.sendAlert(RECOVERY_ALERT, {});
+    expect(lines[0]).toContain("recovered (DISK_CRITICAL → OK)");
+    expect(lines[0]).not.toContain("NOMINAL → OK");
   });
 
   test("sendDigest prints a per-probe summary", async () => {

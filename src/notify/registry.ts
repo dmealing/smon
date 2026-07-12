@@ -8,7 +8,7 @@
 // This is the drift-safety point carried over from Task 7's review: if a payload VO's fields
 // ever change, `meta gen` regenerates AlertPayload/DigestPayload/HeartbeatPayload and this
 // file's `satisfies` pins make a now-nonconforming impl fail `tsc --noEmit` immediately, instead
-// of silently shipping a stale shape. Proof (see task-9-report.md): temporarily narrowing
+// of silently shipping a stale shape. Proof: temporarily narrowing
 // AlertPayload's `kind` (a local edit, reverted) makes `stdoutAdapter satisfies
 // NotifyAdapter<AlertPayload, DigestPayload>` below fail to compile.
 //

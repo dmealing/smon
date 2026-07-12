@@ -1,6 +1,6 @@
 // Task 12 — the parity oracle for the pure alert-policy state machine (decide()).
 //
-// This ports the behavioral oracle from ~/Development/small-model-skills/monitor/test/smon-test.sh
+// This ports the behavioral oracle from small-model-skills monitor/test/smon-test.sh
 // into TypeScript. The bash oracle drives the WHOLE binary (probe -> parse -> POLICY -> notify ->
 // state); decide() is only the POLICY core (bash's eval_probe + the quiet-hours gate that lives in
 // notify_send/in_quiet_hours). So we port the scenario blocks that exercise POLICY, translating

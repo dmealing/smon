@@ -1,5 +1,5 @@
 // matrix notify adapter — Task 9. PUTs an m.room.message via the Matrix client-server API.
-// Ports bash `notify_matrix` (~/Development/small-model-skills/monitor/bin/smon) — including
+// Ports bash `notify_matrix` (small-model-skills monitor/bin/smon) — including
 // the fix documented right in its comment ("A good FALLBACK because it rides different infra"):
 // this is a PUT (client-server API's send-event endpoint is idempotent-by-txnId PUT, not POST),
 // with a per-call unique transaction id and the room id's `:` encoded as `%3A` (NOT full

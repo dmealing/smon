@@ -9,8 +9,8 @@ import type { AlertPayload } from "./AlertPayload.js";
  */
 export function renderAlertEmail(payload: AlertPayload, provider: Provider): EmailDocument {
   return {
-    subject: render({ ref: "emails/alert.subject", payload, format: "text", provider, verify: [{"name":"host"},{"name":"probe"},{"name":"verdict","fields":[{"name":"status"},{"name":"tag"},{"name":"prose"}]},{"name":"kind"},{"name":"enrichedBody"}] }),
-    htmlBody: render({ ref: "emails/alert.html", payload, format: "html", provider, verify: [{"name":"host"},{"name":"probe"},{"name":"verdict","fields":[{"name":"status"},{"name":"tag"},{"name":"prose"}]},{"name":"kind"},{"name":"enrichedBody"}] }),
-    textBody: render({ ref: "emails/alert.txt", payload, format: "text", provider, verify: [{"name":"host"},{"name":"probe"},{"name":"verdict","fields":[{"name":"status"},{"name":"tag"},{"name":"prose"}]},{"name":"kind"},{"name":"enrichedBody"}] }),
+    subject: render({ ref: "emails/alert.subject", payload, format: "text", provider, verify: [{"name":"host"},{"name":"probe"},{"name":"verdict","fields":[{"name":"status"},{"name":"tag"},{"name":"prose"}]},{"name":"kind"},{"name":"enrichedBody"},{"name":"fromTag"}] }),
+    htmlBody: render({ ref: "emails/alert.html", payload, format: "html", provider, verify: [{"name":"host"},{"name":"probe"},{"name":"verdict","fields":[{"name":"status"},{"name":"tag"},{"name":"prose"}]},{"name":"kind"},{"name":"enrichedBody"},{"name":"fromTag"}] }),
+    textBody: render({ ref: "emails/alert.txt", payload, format: "text", provider, verify: [{"name":"host"},{"name":"probe"},{"name":"verdict","fields":[{"name":"status"},{"name":"tag"},{"name":"prose"}]},{"name":"kind"},{"name":"enrichedBody"},{"name":"fromTag"}] }),
   };
 }

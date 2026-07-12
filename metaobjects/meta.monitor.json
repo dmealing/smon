@@ -44,7 +44,8 @@
             { "field.string": { "name": "probe", "@required": true } },
             { "field.object": { "name": "verdict", "@objectRef": "Verdict", "@required": true } },
             { "field.enum": { "name": "kind", "@required": true, "@values": ["fail", "warn", "recovery"] } },
-            { "field.string": { "name": "enrichedBody", "@required": true } }
+            { "field.string": { "name": "enrichedBody", "@required": true } },
+            { "field.string": { "name": "fromTag" } }
           ]
         }
       },
