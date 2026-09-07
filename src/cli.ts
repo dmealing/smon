@@ -57,6 +57,7 @@ import type {
   HeartbeatPayload,
   ProbeState,
   Verdict,
+  VerdictStatus,
 } from "./generated";
 
 // --- injection seams --------------------------------------------------------------------------
@@ -226,7 +227,7 @@ function makeFileLogger(logPath: string): (msg: string) => void {
 // --- notify dispatch (bash notify_send) -------------------------------------------------------
 
 /** The status the WARN-only quiet-hours gate keys on (bash's `status_for_notify`). */
-function notifyStatusForKind(kind: AlertPayloadKind): "OK" | "WARN" | "FAIL" {
+function notifyStatusForKind(kind: AlertPayloadKind): VerdictStatus {
   if (kind === "warn") return "WARN";
   if (kind === "fail") return "FAIL";
   return "OK"; // recovery notifies with status OK
@@ -244,7 +245,7 @@ async function notifySend(
   cfg: Config,
   now: CliNow,
   logLine: (m: string) => void,
-  notifyStatus: "OK" | "WARN" | "FAIL",
+  notifyStatus: VerdictStatus,
   send: (name: AdapterName) => Promise<void>,
 ): Promise<boolean> {
   if (notifyStatus === "WARN" && inQuietHours(cfg, now)) {

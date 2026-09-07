@@ -11,14 +11,26 @@
 // the published contract, not for byte-for-byte parity with bash's bugs, so both are fixed here
 // even though the bash script still has them.
 
+import { VerdictStatusEnum } from "../generated";
 import type { Verdict, VerdictStatus } from "../generated";
 import { PROBES, type ProbeName } from "../generated/probes/roster";
 
 const VERDICT_PREFIX = "verdict: ";
 
+// The status alternation is built from the MODEL, never respelled here. `VerdictStatusEnum` is
+// the runtime constant `meta gen` emits for Verdict.status's `@values`, so the set of legal
+// statuses is declared exactly once (metaobjects/meta.monitor.json) and this parser, the type
+// guard below and the generated `VerdictStatus` union all read that one declaration. Before this
+// artifact existed the member list appeared here TWICE more — inline in the regex and again in
+// `isVerdictStatus` — and adding a fourth status to `@values` would have left both silently
+// rejecting it as BAD_VERDICT, which is a wrong-but-plausible verdict rather than an error.
+// (`.options` is the declaration order, which is also the order the model declares.)
+const VERDICT_STATUS_ALTERNATION = VerdictStatusEnum.options.join("|");
+
 // The one correct pattern for a well-formed verdict line, straight from the published grammar
 // (verdict-contract.md §1 and §3): `verdict: <STATUS> <TAG> — <prose>` where STATUS is one of
-// OK|WARN|FAIL and TAG matches `^[A-Z][A-Z0-9_]{1,23}$` (starts with a letter, 2-24 chars total,
+// the declared Verdict.status members and TAG matches `^[A-Z][A-Z0-9_]{1,23}$` (starts with a
+// letter, 2-24 chars total,
 // digits legal). The separator is a literal " — " (space, em dash U+2014, space).
 //
 // Bash's reference implementation gets this wrong two ways that smon fixes rather than mirrors:
@@ -34,10 +46,12 @@ const VERDICT_PREFIX = "verdict: ";
 // smon parses status/tag/prose with a single regex built from the real grammar, and treats any
 // verdict line that doesn't match it (valid STATUS but a TAG that fails the grammar) as
 // malformed — the same FAIL/BAD_VERDICT shape already used for an invalid STATUS.
-const VERDICT_LINE_PATTERN = /^verdict: (OK|WARN|FAIL) ([A-Z][A-Z0-9_]{1,23}) — (.*)$/;
+const VERDICT_LINE_PATTERN = new RegExp(
+  `^verdict: (${VERDICT_STATUS_ALTERNATION}) ([A-Z][A-Z0-9_]{1,23}) — (.*)$`,
+);
 
 function isVerdictStatus(value: string): value is VerdictStatus {
-  return value === "OK" || value === "WARN" || value === "FAIL";
+  return VerdictStatusEnum.safeParse(value).success;
 }
 
 /**

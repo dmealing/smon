@@ -16,6 +16,7 @@ import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseVerdict, runProbe } from "../src/probes/runner";
+import { VerdictStatusEnum } from "../src/generated";
 
 describe("parseVerdict", () => {
   test("well-formed OK line parses to {OK, NOMINAL, prose}", () => {
@@ -157,6 +158,22 @@ describe("parseVerdict", () => {
     ].join("\n");
     expect(parseVerdict(stdout)).toEqual({ status: "OK", tag: "NOMINAL", prose: "all clear" });
   });
+
+  // The parser's legal status set is DERIVED from the model, not respelled here: runner.ts
+  // builds VERDICT_LINE_PATTERN's alternation and isVerdictStatus from the VerdictStatusEnum
+  // constant `meta gen` emits for Verdict.status's @values. This test asserts the derivation
+  // rather than a literal list — add a fourth status to metaobjects/meta.monitor.json and it
+  // passes untouched, while re-hardcoding "OK|WARN|FAIL" into runner.ts makes it fail.
+  test("every declared Verdict.status member parses (the set is derived from the model)", () => {
+    for (const status of VerdictStatusEnum.options) {
+      expect(parseVerdict(`verdict: ${status} NOMINAL — derived\n`)).toEqual({
+        status,
+        tag: "NOMINAL",
+        prose: "derived",
+      });
+    }
+  });
+
 });
 
 describe("runProbe", () => {
