@@ -9,6 +9,7 @@ export interface Verdict {
   prose: string;
 }
 export type VerdictStatus = "OK" | "WARN" | "FAIL";
+export const VerdictStatusEnum = z.enum(["OK", "WARN", "FAIL"]);
 export const VerdictInsertSchema = z.object({
   status: z.enum(["OK", "WARN", "FAIL"]),
   tag: z.string().min(1),

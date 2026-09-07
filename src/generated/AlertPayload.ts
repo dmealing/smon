@@ -13,6 +13,7 @@ export interface AlertPayload {
   fromTag?: string;
 }
 export type AlertPayloadKind = "fail" | "warn" | "recovery";
+export const AlertPayloadKindEnum = z.enum(["fail", "warn", "recovery"]);
 export const AlertPayloadInsertSchema = z.object({
   host: z.string().min(1),
   probe: z.string().min(1),

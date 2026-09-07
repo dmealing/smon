@@ -1,7 +1,14 @@
 // REFERENCE TEMPLATE — copy this into your repo (e.g. codegen/generators/barrel.ts) and own it.
 // Then import it LOCALLY in metaobjects.config.ts instead of from the package:
-//   import { barrel } from "./codegen/generators/barrel";
+//   import { barrel } from "./codegen/generators/barrel.js";
 //
+// RUNTIME: this file executes under whatever runs `meta gen`, and the published CLI's
+// shebang is `#!/usr/bin/env node` — so it runs under NODE even in a Bun project. Do not
+// reach for `Bun.*` globals here; they are undefined and take the whole run down with
+// `Bun is not defined`. Use `node:` builtins instead.
+// targets:       nothing framework-specific — it re-exports whatever the other generators
+//                emitted. `extStyle` decides whether the re-export specifiers carry a
+//                `.js` extension.
 // use-when:      you want a single `index.ts` re-exporting every generated entity module.
 // emits:         <target>/index.ts with one `export * from "./<Entity>"` per entity, alphabetical.
 // customize:     the export form (star vs named), ordering, grouping by package, what to include/exclude.
@@ -47,17 +54,23 @@ export interface BarrelOpts {
 export const barrel = function barrel(opts?: BarrelOpts): Generator {
   const generator: Generator = {
     name: "barrel",
-    generate: oncePerRun(async (entities, ctx) => ({
-      path: "index.ts",
-      content: await formatTs(
-        renderBarrel(
-          entities.map((e) => ({ name: e.name, package: e.package })),
-          ctx.renderContext!.extStyle,
-          ctx.renderContext!.selfTarget,
-          ctx.renderContext!.entityModuleTarget,
+    generate: oncePerRun(async (entities, ctx) => {
+      if (!ctx.renderContext) {
+        throw new Error("barrel: renderContext is required (provided by runGen)");
+      }
+      const rc = ctx.renderContext;
+      return {
+        path: "index.ts",
+        content: await formatTs(
+          renderBarrel(
+            entities.map((e) => ({ name: rc.valueObjectEmittedName(e), package: e.package })),
+            rc.extStyle,
+            rc.selfTarget,
+            rc.entityModuleTarget,
+          ),
         ),
-      ),
-    })),
+      };
+    }),
   };
   if (opts?.target) {
     generator.target = opts.target;

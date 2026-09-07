@@ -1,6 +1,6 @@
 ---
 name: metaobjects-authoring
-description: Use when authoring or modifying MetaObjects metadata — fields, entities, relationships, sources, enums, abstracts/inheritance — in YAML or canonical JSON.
+description: Use when authoring or modifying MetaObjects metadata — fields, entities, relationships, sources, enums, abstracts/inheritance — in YAML or canonical JSON; includes deciding whether and how to register custom vocabulary (new subtypes or attributes via a provider).
 ---
 
 # Authoring MetaObjects metadata
@@ -49,10 +49,19 @@ aggregate — that is almost always **metadata you have not declared yet.** In o
 1. **Search the vocabulary** — `meta types <term>`, or `meta types --all
    <what-it-does>` to search by behavior. There are field subtypes, relationships,
    projections, origins, identities, sources, and attributes you may not know exist.
-   Find the construct that models it.
+   Find the construct that models it. Add `--detail` for one construct's valid
+   `@attrs`, or `--format json` for the same answer as one machine-readable document
+   — that form carries every match (`--limit` never truncates it) with each attr's
+   `allowedValues`, so you read the accepted values rather than guessing them.
 2. **Declare it and generate** — then *consume* the generated query/type/route;
    never reimplement it alongside.
-3. **Only if no construct can express it** — and you have actually looked —
+3. **If the model is right but the generated OUTPUT is wrong, change your generator.**
+   Naming, file layout, imports, framework, signatures are generator concerns, not
+   reasons to hand-write. The generators are in *your* repo and are yours to edit — a
+   standing rule not to change the MetaObjects repo does not reach them; they are a
+   different repository. Editing one is ordinary work, not an escalation. (See
+   `metaobjects-codegen` → "Your generators are yours".)
+4. **Only if no construct can express it** — and you have actually looked —
    hand-write it, wired to generated types. Business algorithms, external
    integrations, and bespoke interactions are legitimately hand-written; CRUD,
    validation, finders, relationships, and derived/aggregate data are not.
@@ -86,10 +95,20 @@ Read the existing code and schema *first*, then model to reproduce them:
 
 **Customize the CODEGEN to match the existing code before you change the existing code.**
 If generated output doesn't match the code's shape (naming, file layout, imports,
-signatures), **tune the generator/template/config to reproduce it** — that is the
-intended adoption path (owned generators, `outputPattern`, naming strategy — see the
-`metaobjects-codegen` skill), **not a hack**. Reshaping working call sites to satisfy
-the generator's defaults is the *last* resort, not the first.
+signatures), **tune the generator/template/config to reproduce it** — naming strategy
+first, then the generator or the template. **Which lever you have depends on the port,
+so establish that before planning:** on TypeScript and the JVM you can own a generator
+outright (TS scaffolds copies into your repo; the JVM loads your class from the project
+classpath), while on C# and Python the generator registry is closed and a **Mustache
+template** is the customization path — a real one, with `scope` and `outputPattern`
+doing the walk and the file naming. The `metaobjects-codegen` skill has the per-port
+matrix and defines `outputPattern`; read it before concluding a shape is unreachable.
+**Whichever lever you get, it is yours to edit.** A standing instruction not to
+change the MetaObjects repo says nothing about your own generators or templates —
+reading it as though it did is how an adoption ends up hand-written, and it is the most
+common way this step is skipped. Editing a generator or a template here is ordinary
+adoption work: not an escalation, not a hack, and nothing to ask permission for. Reshaping working call sites to satisfy the
+generator's defaults is the *last* resort, not the first.
 
 **Minimize churn to code the generator is not replacing.** The ONLY existing code that
 should change is the hand-written layer codegen now **owns** (the hand-rolled
@@ -198,18 +217,48 @@ name   package   extends   abstract   overlay   isArray   children   value
 | `field.string` | text | `@maxLength` drives `varchar(N)` |
 | `field.int` | 32-bit integer | |
 | `field.long` | 64-bit integer | |
-| `field.double` | float | |
+| `field.double` | double float | approximate; not for money |
+| `field.float` | single-precision float | native double/number (TS has no distinct float); DB `REAL`; not for money |
 | `field.boolean` | true/false | |
 | `field.date` | calendar date | ISO 8601 `YYYY-MM-DD` on the wire |
+| `field.time` | time-of-day | no calendar date; DB `TIME` |
 | `field.timestamp` | instant (tz-aware) | ISO 8601 with timezone on the wire; `@localTime: true` for a naive wall-clock value |
 | `field.decimal` | exact decimal | `@precision` / `@scale`; lossless money/quantity |
 | `field.currency` | integer minor units | see Currency below |
 | `field.enum` | string member | `@values` required; see Enum below |
 | `field.uuid` | UUID | canonical lowercase hex on the wire |
 | `field.object` | embedded value object | `@objectRef` + `@storage`; see below |
+| `field.map` | open-keyed map | one jsonb column; string keys; `@valueType` (scalar subtype) XOR `@objectRef` (value object); `isArray` does not apply |
 
 Common field attributes: `@required`, `@maxLength`, `@column` (physical column
-name), `@default`, `@filterable`, `@sortable`.
+name), `@default`, `@filterable`, `@sortable`. On temporal fields
+(`field.date`/`field.time`/`field.timestamp`) `@autoSet` stamps the value
+automatically — see the `@autoSet` callout under Timestamps below.
+
+#### What `@required` actually means
+
+`@required: true` is **NOT NULL** (presence). Two consequences that are easy to
+get wrong:
+
+1. **On a non-array string it also rejects `""` — but only at the wire tier.**
+   Generated *input* validation (the create/patch models behind POST/PATCH)
+   rejects the empty string by default; whitespace-only IS accepted. Generated
+   in-process read models never enforce this at construction, so reading an
+   existing row containing `""` does not throw.
+2. **To say "must be provided, but may be empty", author an explicit
+   `validator.length` with `@min: 0`.** An explicitly authored `@min` is always
+   authoritative over that implicit non-empty floor; the floor applies only when
+   no `@min` is authored at all. Dropping `@required` is NOT the way to express
+   this — that makes the field optional and loses presence typing.
+
+```jsonc
+// must be provided; empty string allowed
+{ "field.string": { "name": "note", "@required": true, "children": [
+  { "validator.length": { "name": "noteLen", "@min": 0 } }
+]}}
+```
+
+Arrays are unaffected: `@required` on an array field is presence only.
 
 ### Choosing the right shape — the general decision procedure (ADR-0037)
 
@@ -277,14 +326,14 @@ Canonical form for common field needs — reach for these before inventing anyth
 | IDs / unique keys / **any UUID column** | `field.uuid` | native UUID type. **NEVER `field.string` + `@dbColumnType: uuid`** — see the smell callout below |
 | Money | `field.currency` | integer minor units; never a float |
 | Closed set of symbols | `field.enum` | `@values` required |
-| Instant / event time (created/updated) | `field.timestamp` | instant / tz-aware by default (Postgres `timestamptz`; native `Instant`/`DateTimeOffset`/aware `datetime`) |
+| Instant / event time (created/updated) | `field.timestamp` + `@autoSet` | instant / tz-aware by default (Postgres `timestamptz`; native `Instant`/`DateTimeOffset`/aware `datetime`); `@autoSet: onCreate` for `createdAt`, `@autoSet: onUpdate` for `updatedAt` — never hand-stamp |
 | Naive wall-clock value (store-open time, birthday-with-time) | `field.timestamp` + `@localTime: true` | `timestamp without time zone` — opt out of zone-awareness only for a genuine wall-clock value |
 | A list of anything | `isArray: true` | on the base subtype (e.g. `field.string` + `isArray`) — there is **no** array `@dbColumnType` (retired) |
 | Long / unbounded text | bare `field.string` | add `@maxLength` only when you want `varchar(N)` |
 | Nested structured value | `field.object` | `@objectRef` + `@storage` |
 | Open JSON bag (no fixed shape) | `field.string` + `@dbColumnType: jsonb` | logical type stays string; column is jsonb |
-| URL / URI | `field.uri` | native `URI`/`Uri`; `text` column; URL validation — a real native type + behavior, so a subtype (not a validated string) |
-| IP address | `field.inet` | native IP type; Postgres `inet` column |
+| URL / URI | `field.uri` | native `URI`/`Uri`; `text` column; strict absolute-URI validation (add `@lenient: true` to store any string) — a real native type + behavior, so a subtype (not a validated string) |
+| IP address | `field.inet` | native IP type; Postgres `inet` column; strict IPv4/IPv6-literal validation (add `@lenient: true` for a plain-string `text` column) |
 | Validated plain string (email / hostname) | `field.string` + `@stringFormat` | `@stringFormat: email` or `@stringFormat: hostname` — idiomatic per-port validation; don't hand-write the `validator.regex` |
 
 **UUID columns are `field.uuid` — `field.string` + `@dbColumnType: uuid` is a forbidden smell.**
@@ -322,6 +371,38 @@ lives in `field.timestamp` (instant by default) + the `@localTime` naive opt-out
 { "field.timestamp": { "name": "opensAt", "@localTime": true } }
 ```
 
+**URIs / IPs — strict by default, `@lenient` to store any string (#234).** `field.uri` is a
+strict **absolute, scheme-bearing URI** (`https://a.com`, `mailto:a@b`; a scheme-less
+`example.com` or a bare `/path` is rejected) and `field.inet` is a strict **IPv4/IPv6 literal**
+(no hostnames, no CIDR). When a field must hold a *not-necessarily-well-formed* value — an
+LLM-emitted citation URL, a user-supplied host that might be a name — add **`@lenient: true`**:
+codegen then binds a plain string (no URL/IP validator) and a `field.inet @lenient` uses a plain
+`text` column instead of the native `inet` type (so a value the native column would reject at
+INSERT round-trips unchanged). Strict is the default; `@lenient` is the deliberate opt-out (never
+default-true — the same shape as `@localTime`). **Toggling `@lenient` on an existing `field.inet`
+is schema-affecting** (`inet` ⇄ `text`), so it shows up as an `ALTER` on the next `meta migrate`.
+
+```json
+{ "field.uri":  { "name": "homepage" } }                       // strict — must be an absolute URL
+{ "field.uri":  { "name": "citationUrl", "@lenient": true } }  // any string (LLM-emitted, may be malformed)
+{ "field.inet": { "name": "sourceIp" } }                       // strict — IPv4/IPv6 literal only
+{ "field.inet": { "name": "reportedHost", "@lenient": true } } // any string; text column
+```
+
+**`@autoSet` — let the runtime stamp created/updated times; never hand-set them.**
+`@autoSet` is registered on the temporal subtypes (`field.date` / `field.time` /
+`field.timestamp`) and takes **`onCreate`** (stamp on insert) or **`onUpdate`**
+(stamp on every write). This is the model-first way to express audit timestamps —
+declare it and the generated write path stamps the column, so you never hand-write
+`createdAt = now()` in application code (the exact hand-stamping anti-pattern). A
+`@required` field carrying `@autoSet: onCreate` is correctly *optional* on POST (the
+server supplies it).
+
+```json
+{ "field.timestamp": { "name": "createdAt", "@autoSet": "onCreate", "@required": true } }
+{ "field.timestamp": { "name": "updatedAt", "@autoSet": "onUpdate" } }
+```
+
 **String-shaped natives & validated strings (ADR-0036 Wave 3).** A URL/URI is its own
 native type with URL behavior → **`field.uri`** (subtype, step 2a), not a validated
 string. An IP address likewise → **`field.inet`**. An email or hostname is a *plain
@@ -355,17 +436,39 @@ metamodel attribute*: you declare the FK once via `identity.reference`, and the 
 finders fall out of codegen. So never hand-roll a `findByParentId` / `WHERE fk = ?` helper —
 consume the generated finder.
 
-**Extending the metamodel (custom providers):** the same ordered procedure above
-governs new vocabulary you register — apply it mechanically before registering
-anything. A would-be subtype that differs from an existing one only by a *property*
-is an **attribute**, not a subtype (a "short string" isn't a new field subtype —
-that is `@maxLength`); a plain string that merely needs validating is a **validation
-attribute**, not a subtype (its native type is still `string`, and there's no
-behavior to own); a concept with its own native type or behavior is a **subtype**,
-and structural variants *within* such a subtype are `@kind`. Every new first-class
-element also requires a registered provider + a `registry-conformance` fixture
-(ADR-0023 strict provenance), and closed enums (including any `@kind` value-set)
-carry `allowedValues` in the gate (ADR-0036). ADR-0037 is the authority.
+### Extending the metamodel — custom providers, and the downstream lifecycle
+
+The same ordered procedure above governs new vocabulary you register — apply it
+mechanically before registering anything. A would-be subtype that differs from an
+existing one only by a *property* is an **attribute**, not a subtype (a "short
+string" isn't a new field subtype — that is `@maxLength`); a plain string that merely
+needs validating is a **validation attribute**, not a subtype (its native type is
+still `string`, and there's no behavior to own); a concept with its own native type
+or behavior is a **subtype**, and structural variants *within* such a subtype are
+`@kind`. Every new first-class element also requires a registered provider + a
+`registry-conformance` fixture (ADR-0023 strict provenance), and closed enums
+(including any `@kind` value-set) carry `allowedValues` in the gate (ADR-0036).
+ADR-0037 is the authority.
+
+**Converge before inventing.** Search the shipped vocabulary first (`meta types
+<term>`) and check the roadmap — if core already models (or plans) the concept, model
+yours in a fold-in-friendly shape. The type names `api`, `operation`, `surface`, and
+`binding` are chartered for planned core vocabulary — never claim one for a
+project-local type (a later core release would force a breaking rename).
+
+**Design rules for downstream vocabulary that ages well.** Keep the node protocol-
+and address-free — the subtype names the *concept*; transport/protocol is a closed
+`@kind` variant *within* the subtype (as `source.rdb` puts table/view behind
+`@kind`), never the subtype axis, and endpoints/addresses never enter metadata.
+Declare config as the *names* of required keys (values stay in env/config) and
+generate a fail-closed check. Reference typed payloads instead of inlining shapes.
+
+**Lifecycle.** Register with explicit provider wiring — never loosen `strict` to
+free-ride ad-hoc attrs. When core later ships the concept your provider shrinks from
+`register` to `extend` (the `template.toolcall` precedent). A second independent
+consumer wanting the same concept is a consumer→core promotion candidate (ADR-0011) —
+open an upstream issue rather than adding core vocabulary yourself. Full guidance:
+`docs/features/downstream-metadata-decisions.md`.
 
 ### Currency
 
@@ -464,8 +567,13 @@ The `[]` key-suffix declares an array field: `field.long[]: weekIds` lowers to
 canonical JSON. `@enforce` on a reference (default `true`) controls whether the
 backend physically enforces it (a SQL FK constraint); set `false` for a logical
 reference for navigation/typing/codegen only. Referential actions
-(`@onDelete`/`@onUpdate`) are NOT on `identity.reference` — they live on the
-`relationship.*` node (see Relationships below).
+(`@onDelete`/`@onUpdate`) normally live on the `relationship.*` node (see
+Relationships below — the subtype carries the default), but `identity.reference`
+also registers them as the **explicit per-FK override** (ADR-0047): use them for
+a reference-only FK with no relationship, an M:N junction's FK sides (no
+relationship ever correlates with a junction FK), or a single FK that must
+deviate from its relationship's action. A reference-level action always wins
+over the correlated relationship's.
 
 `@references` resolves cross-package by **fully-qualified name**
 (`@references: "shared::billing::Account"`), the same rule as `extends`; a bare
@@ -501,46 +609,108 @@ does NOT enforce uniqueness. Choose the right construct by what the constraint I
 | Unique alternate key (e.g. email, slug) | `identity.secondary` — uniqueness is the type |
 | Query-performance index, no uniqueness | `index.lookup` |
 
-`@fields` names the indexed columns and is **required** (at least one). The db provider
-contributes physical-tuning attrs: `@orders` (per-column sort direction), `@using` (access
-method — `gin`/`gist`/`hash`; default `btree`), `@expr` (key expression derived from
-`@fields`, e.g. for a functional index), and `@where` (partial-index predicate).
+**An index keys off EXACTLY ONE of `@fields` or `@expr`.** `@fields` names the indexed
+columns; `@expr` is a raw key expression used **instead of** `@fields` (a functional index).
+Declaring **neither** — or **both** — is `ERR_INVALID_INDEX`. This applies to
+`identity.secondary` as well as `index.lookup`: uniqueness lives in the type, so a unique
+index keys itself the same way.
+
+Legacy metadata declaring both used to load, with `@fields` **silently discarded**. If you
+meet one, `meta upgrade --apply` drops `@fields` — do not hand-pick the survivor: the index
+in the database is the expression one, so keeping `@expr` reproduces it and keeping
+`@fields` would emit a migration against live data.
+
+The db provider contributes physical-tuning attrs alongside either form: `@orders`
+(per-column sort direction), `@using` (access method — `gin`/`gist`/`hash`; default
+`btree`), and `@where` (partial-index predicate).
 
 ```json
 { "index.lookup": { "name": "byCreatedAt", "@fields": ["createdAt"], "@orders": ["desc"] } }
 { "index.lookup": { "name": "byStatusCreatedAt", "@fields": ["status", "createdAt"] } }
-{ "index.lookup": { "name": "byEmailCI", "@fields": ["email"], "@expr": "lower(email)" } }
+{ "index.lookup": { "name": "byEmailCI", "@expr": "lower(email)" } }
+{ "identity.secondary": { "name": "uniqLowerEmail", "@expr": "lower(email)" } }
 ```
+
+> **Do not write `@fields` and `@expr` together.** It reads as "index this column, by this
+> expression", but the expression is the whole key — the `@fields` list was silently
+> discarded. It is now refused rather than half-honoured.
 
 `index.lookup` is a sibling of `identity.*` — declare it as a direct child of an `object.entity`,
 at the same level as fields and identities.
 
 ## Relationships
 
-`relationship.composition` is the "this entity owns / aggregates instances of
-that entity" side; `identity.reference` (above) is the FK-column side. They are
-the two halves of one FK.
+A `relationship.*` child is the navigation / ownership side of a link to another
+entity; `identity.reference` (above) is the FK-column side. They are the two halves
+of one FK. **Choose the subtype by ownership semantics — it decides the default
+referential action**, so modeling every FK as `composition` silently arms unintended
+`CASCADE` deletes:
 
-| Attr | On | Values |
-|---|---|---|
-| `@objectRef` | composition | target entity name |
-| `@cardinality` | composition | `one` / `many` |
-| `@onDelete` / `@onUpdate` | `relationship.*` only | `cascade` / `set-null` / `restrict` / `no-action` |
+| Subtype | Ownership | Default `@onDelete` | Use when |
+|---|---|---|---|
+| `relationship.composition` | owns the target's lifecycle | `cascade` | children are owned and deleted with the parent |
+| `relationship.aggregation` | groups, does NOT own | `set-null` | children outlive the parent; delete nulls the FK |
+| `relationship.association` | plain reference, no ownership | `restrict` | you just point at an independent entity |
+
+Common attrs (on any subtype): `@objectRef` (target entity name / FQN),
+`@cardinality` (`one` / `many`), and `@onDelete` / `@onUpdate`
+(`cascade` / `set-null` / `restrict` / `no-action`). `@onDelete` defaults **per
+subtype** as in the table; `@onUpdate` defaults to `cascade` on every subtype.
 
 ```json
-{ "relationship.composition": {
-    "name": "posts", "@objectRef": "Post",
-    "@cardinality": "many", "@onDelete": "cascade" } }
+{ "relationship.composition": { "name": "posts",   "@objectRef": "Post", "@cardinality": "many" } }
+{ "relationship.aggregation": { "name": "members", "@objectRef": "User", "@cardinality": "many" } }
+{ "relationship.association": { "name": "author",  "@objectRef": "User", "@cardinality": "one" } }
 ```
 
-**Adoption footgun — pin BOTH actions.** `@onDelete` and `@onUpdate` each default to
-`cascade` when omitted, but a plain SQL foreign key is `NO ACTION` on both. If you're
-adopting an existing database (matching metadata to a live schema), omitting these
-makes the metadata declare `CASCADE` where the DB has `NO ACTION` — a perpetual
-`verify --db` drift. Pin **both** explicitly to the DB's real behavior:
+**Many-to-many (FR-018) — `@through` a junction entity.** Model an M:N link with
+`@cardinality: "many"` + `@objectRef` (the target) + **`@through`** (the junction
+entity). The junction MUST declare **two `identity.reference` children**, one per FK
+side; the relationship's FK fields are **derived** from those references — never
+restated. Two optional attrs handle self-joins:
+
+- `@sourceRefField` — names the source-side FK field on the junction, disambiguating a
+  **directed** self-join (e.g. `follows`, where both references point at `User`).
+- `@symmetric: true` — marks an **undirected** self-join (union-on-read). Valid only
+  when `@objectRef` is the declaring entity itself, and **mutually exclusive** with
+  `@sourceRefField`.
+
+(Any relationship subtype carries the M:N attrs; the conformance fixtures author them
+on `relationship.association`.)
 
 ```json
-{ "relationship.composition": { "name": "author", "@objectRef": "User",
+{ "relationship.association": {
+    "name": "tags", "@cardinality": "many",
+    "@objectRef": "Tag", "@through": "PostTag" } }
+```
+
+The `PostTag` junction supplies the FK direction via its two references:
+
+```json
+{ "object.entity": { "name": "PostTag", "children": [
+    { "field.long": { "name": "id" } },
+    { "field.long": { "name": "postId" } },
+    { "field.long": { "name": "tagId" } },
+    { "identity.primary":   { "name": "id", "@fields": "id" } },
+    { "identity.reference": { "name": "postRef", "@fields": "postId", "@references": "Post" } },
+    { "identity.reference": { "name": "tagRef",  "@fields": "tagId",  "@references": "Tag" } }
+] } }
+```
+
+A junction's FK actions are declared on its `identity.reference` children
+directly (`"@onDelete": "cascade"` on `postRef`/`tagRef` above) — the M:N
+relationship's `@objectRef` names the far side, never the junction, so no
+relationship ever correlates with a junction FK (ADR-0047).
+
+**Adoption footgun — pin BOTH actions.** `@onDelete` defaults *per subtype* (above)
+and `@onUpdate` defaults to `cascade` — but a plain SQL foreign key is `NO ACTION` on
+both. If you're adopting an existing database (matching metadata to a live schema),
+leaving these implicit makes the metadata declare a referential action the DB doesn't
+have — a perpetual `verify --db` drift. Pin **both** explicitly to the DB's real
+behavior:
+
+```json
+{ "relationship.association": { "name": "author", "@objectRef": "User",
     "@cardinality": "one", "@onDelete": "no-action", "@onUpdate": "no-action" } }
 ```
 
@@ -579,27 +749,204 @@ These are children of `object.entity`, alongside its fields and identities.
 | `storedProc` | yes | – |
 | `tableFunction` | yes | – |
 
-The physical name is `@table` (NOT `@name`). The physical column name on a field
-is `@column`. `@schema` namespaces the DB schema (Postgres default `public`;
-SQLite rejects non-default values). Multi-source: multiple `source.rdb` children,
-each with a `@role`, exactly one `primary`.
+The physical name attr is **kind-matched** — never `@name`: `@table` for a table,
+`@view` for a view, `@materializedView`, `@proc` (storedProc), `@function`
+(tableFunction). (`@table` on a non-table kind is a pre-1.0 legacy spelling the
+canonical serializer rewrites to the kind's alias; author the kind-matched attr
+directly.) The physical column name on a field is `@column`. `@schema` namespaces
+the DB schema (Postgres default `public`; SQLite rejects non-default values).
+Multi-source: multiple `source.rdb` children, each with a `@role`, exactly one
+`primary`.
 
 ```json
-{ "source.rdb": { "@kind": "view", "@table": "v_author", "@schema": "blog" } }
+{ "source.rdb": { "@kind": "view", "@view": "v_author", "@schema": "blog" } }
 ```
 
+**This declaration is the only place a physical name is ever spelled.** Codegen emits a
+per-object names artifact from it (`<Entity>Names` — `ProgramNames.fields.createdAt.column`,
+`ProgramNames.CreatedAtColumn`, `PROGRAM_CREATED_AT_COLUMN`, per port), the generated table
+binding reads that artifact, and hand-written SQL, repositories and migration scripts
+reference it — so a consumer never restates `v_author` or `created_at`, and a rename here
+propagates. Declare `@column` explicitly whenever the physical name is not the naming
+strategy's answer (`callPurpose` → `purpose_code`): nothing downstream can recover that
+mapping by derivation, and the constant is what carries it. (See `metaobjects-codegen` →
+"Never hand-write a physical name".)
+
 **An entity's PRIMARY source must be writable** (`table`) — read-only kinds are
-legal only in non-primary roles (e.g. table `primary` + view `replica` for
-read-through). A derived read model over a view/proc is an **`object.projection`**
+legal only in non-primary roles.
+
+### Derived/computed columns: reach for an ENTITY READ-VIEW first
+
+**Do not default to `object.projection` for a list screen, grid, or "one extra
+column" read.** The usual need — an entity's own rows plus a joined display name or a
+per-row count, filterable and sortable like any other column — is an **entity
+read-view**, not a projection:
+
+```jsonc
+{ "object.entity": { "name": "Order", "children": [
+  { "source.rdb": { "@kind": "table", "@table": "orders" } },              // writes
+  { "source.rdb": { "@kind": "view", "@view": "v_order", "@role": "replica" } },  // reads
+  // …the entity's own fields stay as they are — you re-state NOTHING…
+  { "field.string": { "name": "customerName", "@filterable": true, "children": [
+    { "origin.passthrough": { "@from": "Customer.name" } } ]}},
+  { "field.int": { "name": "itemCount", "@filterable": true, "children": [
+    { "origin.aggregate": { "@agg": "count", "@of": "OrderItem.id", "@via": "Order.items" } } ]}}
+]}}
+```
+
+That is the whole change. Writes route to the table (derived fields are excluded from
+the write codecs); reads route to the view; `meta migrate` emits the `CREATE VIEW` from
+the **same assembly logic** a projection view uses — one emitter, two hosts (FR-024 §7,
+#213/#214). Filtering and sorting on `customerName` / `itemCount` work like any other
+column because the filter tier runs against the view.
+
+**Reach for a projection only when one of these is true** (from
+`docs/features/source-kinds.md`, which carries the full decision table):
+
+| Entity read-view | Projection |
+|---|---|
+| extras sit over the entity's **own** table | an independent **exposure contract** |
+| same trust domain — a new entity field showing up in the view is correct | a subset, **renamed** columns, versioned, or external consumers |
+| the base is still INSERTable and is the record of truth | keyless, multi-base, proc-backed, all-derived, or borrowed identity |
+
+Two things genuinely force a projection: **renamed base columns** (a field carries one
+`@column` per paradigm) and **row-filtered views** (soft-delete / `WHERE status='active'`
+— an entity read-view exposes the whole entity; only a projection carries a row-scope
+`@filter`, #207).
+
+Choosing a projection when a read-view would do costs a second URL, a second type, a
+second identity declaration, and re-stating every passthrough column — for no gain.
+
+> Historical note for anyone porting older advice: before 0.17.0 (2026-07-18) an entity
+> hosting a derived field silently produced no view and read the wrong table, so a
+> projection genuinely WAS the only way to get a grid with a derived column. That is
+> fixed; guidance written before then is stale.
+
+A derived read model that IS an independent exposure is an **`object.projection`**
 (FR-024): its fields `extends` entity fields (`extends: "Author.id"` — dotted
 child traversal, package only on the root segment) and/or carry `origin.*`
-children (`passthrough` / `aggregate` / `collection`) declaring assembly; its
-identity passes through via `extends` (`identity.primary: { name: id, extends:
-"Author.id" }`); it is read-only by construction and the declared field set IS
-the exposure (fail-closed). Give it a read-only `source.rdb` `@kind: view`
-child (`source.rdb: { kind: view, table: v_author }`) — codegen keys projection
-detection + view DDL off that read-only source, so without it `meta gen` emits
-nothing for the projection.
+children (`passthrough` / `aggregate` / `computed` / `first`)
+declaring assembly; its identity passes through via `extends` (`identity.primary:
+{ name: id, extends: "Author.id" }`); it is read-only by construction and the
+declared field set IS the exposure (fail-closed). Give it a read-only `source.rdb`
+`@kind: view` child (`source.rdb: { kind: view, view: v_author }`) — codegen keys
+projection detection + view DDL off that read-only source, so without it `meta gen`
+emits nothing for the projection.
+
+**The borrowed key may be ANY unique key — including a composite, and including the
+entity's `identity.secondary`.** The single-field `extends: "Author.id"` above is the
+common case, not the limit. Both of these are legal:
+
+```yaml
+# Composite primary → composite primary. @fields is COMPUTED from the local
+# pass-through fields, so it is optional here (declare it and it must agree).
+- identity.primary: { name: pk, extends: "Order.pk" }      # Order.pk = [tenant, ref]
+
+# A read model keyed on the entity's BUSINESS key, never surfacing its surrogate id.
+# Account has both: identity.primary pk (auto-increment id) AND identity.secondary
+# byCode (tenant + code). The view exposes tenant + code and borrows byCode.
+- identity.primary: { name: pk, extends: "Account.byCode" }
+```
+
+The rule is **uniqueness, not nomination**: ADR-0040 put uniqueness in the type, so
+`identity.primary` and `identity.secondary` are both unique keys and either can back a
+projection's key. `identity.reference` cannot — a foreign key is not unique, so
+`identity.primary extends: "Account.ownerRef"` is `ERR_EXTENDS_TARGET_MISMATCH`.
+
+Key correspondence still holds in every case: every field named by the borrowed identity's
+`@fields` needs a local field `extends`-ing that entity field, or the load fails with
+`ERR_IDENTITY_KEY_MISMATCH` — the identity cannot claim a pass-through the fields do not
+make.
+
+**A CONCRETE projection declares its OWN source — never inherits one.** A
+projection may `extends` another projection to reuse shape, but the child must
+declare its own `source.rdb`; inheriting the parent's is
+`ERR_PROJECTION_INHERITED_SOURCE`. `extends` only ADDS fields, so an inherited view
+cannot provide the child's extra columns, and two objects would claim one physical
+view with different exposures. The sanctioned pattern is an **abstract, sourceless**
+projection base carrying shared shape, with each concrete projection declaring its
+own view — so a versioned successor (`CustomersV2 extends CustomersV1`) declares
+`v_customers_v2` rather than silently sharing V1's view. (Same rule JPA gets from
+`@MappedSuperclass` and Django documents as the `db_table`-on-abstract trap; ADR-0028
+amendment 2026-08-06.)
+
+**Origin vocabulary (#195).** `origin.aggregate @agg` takes `count`/`sum`/`avg`/`min`/`max`
+(numeric reduces over `@of`), `any`/`all` (predicate quantifiers over a `@filter`; `@of`
+forbidden; empty set → `any=false`, `all=true`), and `collect` (an array rollup
+into an `isArray` field, with optional `@distinct` / `@orderBy`). **`collect` is the one
+`@agg` where `@of` is OPTIONAL (#335):** name a column with `@of` to collect scalars, or
+omit `@of` on a `field.object @objectRef` to collect each related row as that declared
+value object — a **whole-object rollup**, lowered to `jsonb_agg(jsonb_build_object(…))`
+on Postgres. The whole-object form requires an explicit `@via`, refuses `@distinct` (it is
+a no-op whenever the value object carries the primary key), and requires every value-object
+member to match a field on the `@via` **terminal** entity by name, with the same subtype
+and array-ness. The declared value object IS the exposure: a field the entity has and the
+value object omits is not projected. Any aggregate may be
+row-scoped with `@filter`. `origin.computed` carries a closed structured `@expr` tree (a
+derived scalar). `origin.first` picks one related row's column (`@of`) along `@via`,
+ordered by a **required `@orderBy`** (`["field:asc|desc", …]`, with the PK as tie-break) —
+the ordering is what makes `origin.first` express "latest / earliest X"; it may be
+row-scoped with `@filter` and is nullable. A field carrying any `origin.*` is derived ⇒
+read-only.
+
+`@expr` and `@filter` are **structured objects, not SQL strings** — guessing a string
+body fails the load:
+
+- **`@expr`** (on `origin.computed`) is a closed operation tree; a string body is a load
+  error (`ERR_BAD_ATTR_VALUE`):
+  ```json
+  { "origin.computed": { "@expr": { "op": "isNotNull", "arg": { "field": "payloadJson" } } } }
+  ```
+- **`@filter`** (on `origin.aggregate` / `origin.first`, and object-level on a projection)
+  is an `attr.filter` object — a field→predicate map. A bare value is `eq` shorthand; an
+  operator map spells the op:
+  ```json
+  { "origin.aggregate": { "@agg": "any", "@via": "Session.turns", "@filter": { "success": false } } }
+  { "@filter": { "status": { "ne": "archived" } } }
+  ```
+
+**Projection row-scope `@filter` (#207).** An object-level `@filter` on `object.projection`
+(the same `attr.filter` object shown above) scopes the WHOLE view's rows — it lowers to
+the view's outer `WHERE`. This is the metadata-managed way to author a soft-delete /
+status / type view without hand-writing SQL. It may reference **only declared,
+non-aggregate-derived** projection fields: naming an undeclared field fails the load
+(`ERR_BAD_ATTR_FILTER`), and so does naming a field whose value comes from an
+`origin.aggregate`.
+
+```json
+{ "object.projection": { "name": "ActiveOrders",
+    "@filter": { "status": { "ne": "archived" } }, "children": [ … ] } }
+```
+
+**The `CREATE VIEW` body is generated from those `origin.*` children by the Node
+`meta migrate` — never hand-author view SQL for a shape origins can express** (an unmodeled
+view is *unmanaged*, so `meta verify --db` can't even catch the drift). For a genuinely
+irreducible body (recursive CTE, window function, set operation) that origins can't express,
+carry it in the `source.rdb` **`@sql`** escape (#208, ADR-0043) — a hand-written body the
+tool registers, fingerprints, and drift-checks (adopt a pre-existing view with
+`meta migrate --allow adopt-view`) — rather than a hand-edited migration file where it goes
+accidentally unmanaged. For a DB object owned entirely elsewhere (Flyway), mark its source
+**`@unmanaged: true`** (view or table); migrate/verify then never touch it.
+
+**`@sql` fail-closed rules — an `@sql` body is a *second* source of truth, so the loader
+walls it off (#208).** Author an `@sql` source under these constraints or the load fails:
+
+- `@sql` is legal **only on a read-only `@kind`** (view / materializedView / storedProc /
+  tableFunction) — never on a writable `@kind: table` (`ERR_SQL_BODY_ON_WRITABLE_KIND`).
+- **No `origin.*`-bearing field may live under an `@sql` host** — the body already *is*
+  the derivation, so an origin alongside it is a double-declaration
+  (`ERR_ORIGIN_UNDER_SQL_BODY`). If you add an `@sql` body to a projection, **move its
+  derived fields out** (into plain declared fields the body computes) rather than keeping
+  their `origin.*` children.
+- The object-level `@filter` (#207) is **mutually exclusive with `@sql`** (same error) —
+  fold the predicate into the `@sql` body's own `WHERE`.
+- `@sql` and `@unmanaged` are **mutually exclusive** (`ERR_SQL_BODY_WITH_UNMANAGED`); an
+  empty/whitespace `@sql` is rejected (`ERR_BAD_ATTR_VALUE`).
+- Under **`@unmanaged`**, an `origin.*`-bearing field only **warns** (the marker acts on
+  nothing, so a documented-but-unacted-on lineage is benign) — the asymmetry with `@sql`
+  is deliberate.
+- Today `meta migrate` **lowers `@sql` only on `@kind: view`**; on matview / storedProc /
+  tableFunction it is registered but not yet migrate-managed (mark those `@unmanaged`).
 
 **A `passthrough` field must match its `@from` source's type.** A passthrough
 forwards the source value unchanged, so the projection field's `field.<subType>`
@@ -641,10 +988,12 @@ Resolution facts:
 
 - **Deferred.** `extends:` resolves *after all files load* — abstracts can live in
   any file, forward references are fine.
-- **Multi-level chains flatten** (`Author extends BaseEntity extends Auditable`).
+- **Multi-level chains resolve through the whole chain** (`Author extends BaseEntity
+  extends Auditable`) — each `extends` is a super-*reference*, so resolution walks the
+  full chain (it does not flatten inherited members onto the child; see ADR-0039 below).
 - **Cross-package** refs use the fully-qualified name (`extends: "shared::auditable"`);
   same-package refs use the bare name.
-- An unresolved reference fails with `ERR_UNKNOWN_EXTENDS`.
+- An unresolved reference fails with `ERR_UNRESOLVED_SUPER`.
 
 `abstract` and `extends` are **structural keys** (bare, no `@`).
 
@@ -700,6 +1049,31 @@ mapping).
     discriminatorValue: Bridge
     children:
       - field.int: { name: quantity, required: true }
+```
+
+## Requirements — capability ledger (opt-in)
+
+**This capability exists whether or not the project uses it yet.** `requirement.functional` and `requirement.architectural` are registered metadata types, declared in `metaobjects/` beside the entities they describe and loaded by the same loader — no side file, no bespoke parser. They record *why* each part of the model exists, so a field with no reason to exist becomes visible as one.
+
+Reach for it when the project needs to answer any of:
+
+- **"Why is this field here?"** — an L5 requirement binds a claim to a specific member. Authoring these exhaustively is what surfaces columns nothing reads and vocabularies nobody documented.
+- **"What is broken but known?"** — `@status: partial` plus `@disposition: accepted | deferred`. Absent disposition means *undecided*, and `meta verify` counts those: the gaps nobody has ruled on.
+- **"What did we say we would build and have not?"** — `@status: planned` is the one status where a dangling `@implementedBy` is *correct*, because the entry precedes the nodes.
+- **"What have we committed to build?"** — `@status: planned`. Its references may dangle, and it never counts toward object coverage.
+- **"Which ticket covers this?"** — `@trackedBy`.
+
+Every requirement must be **violable**: if you cannot say what breaking it looks like, it is a description, not a requirement.
+
+If the project declares any `requirement.*` node, `references/requirements.md` is installed with the full authoring rules. If it does not and you are adding the first one, the shape is:
+
+```yaml
+- requirement.architectural:
+    name: everyStoredRowIsAddressable
+    status: live
+    statement: Every persisted row declares the identity by which it is addressed.
+    counterexample: A row that can be inserted but never pointed at.
+    implementedBy: [acme::shop::Order]
 ```
 
 ---

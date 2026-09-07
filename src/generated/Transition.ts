@@ -11,6 +11,7 @@ export interface Transition {
   kind: TransitionKind;
 }
 export type TransitionKind = "fail" | "warn" | "recovery";
+export const TransitionKindEnum = z.enum(["fail", "warn", "recovery"]);
 export const TransitionInsertSchema = z.object({
   time: z.string().min(1),
   probe: z.string().min(1),

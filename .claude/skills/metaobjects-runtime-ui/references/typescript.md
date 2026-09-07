@@ -67,6 +67,26 @@ await om.transaction(async (tx) => { /* ... */ });
 > `node-postgres`, `@neondatabase/serverless`; NOT on `better-sqlite3` / `bun:sqlite`
 > (no native RETURNING) — use a custom driver or `inMemoryDriver` there.
 
+### Physical names: the column object first, `<Entity>Names` where there is none
+
+The generated query helpers and `ObjectManager` never make you spell a table or column.
+Where you drop below them, bind to the Drizzle column object (`programs.createdAt` —
+checked against the schema at compile time), never a string. What Drizzle does not
+reach — a `sql` template fragment, a string-keyed Kysely identifier, a migration script,
+a log line — takes the generated `<Entity>.names.ts` (`namesFile()` is in the `meta init`
+scaffold):
+
+```ts
+import { sql } from "drizzle-orm";
+import { ProgramNames } from "./generated/Program.names.js";
+
+sql`SELECT ${sql.identifier(ProgramNames.fields.createdAt.column)}
+    FROM ${sql.identifier(ProgramNames.sources.primary.table)}`
+```
+
+A literal is a second spelling of a fact the metadata owns: `@column` is free-form, and a
+rename in metadata moves the constant, not the string.
+
 ## Return-type contract
 
 The runtime returns **native in-process types**, never wire strings — temporal

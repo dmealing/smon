@@ -17,6 +17,7 @@ export interface DigestPayload {
   transitions24h: Transition[];
 }
 export type DigestPayloadWorstStatus = "OK" | "WARN" | "FAIL";
+export const DigestPayloadWorstStatusEnum = z.enum(["OK", "WARN", "FAIL"]);
 export const DigestPayloadInsertSchema = z.object({
   host: z.string().min(1),
   date: z.string().min(1),

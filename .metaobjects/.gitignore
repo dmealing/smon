@@ -1,4 +1,10 @@
-.gen-state/
+.gen-state/*
+# ...except the codegen ownership manifest, which MUST be committed: it is the only
+# thing that lets `meta gen` tell 'this file is exactly what I wrote' from 'somebody
+# edited this' on a machine that did not generate it (a fresh clone, or CI). The glob
+# above matters — git will not descend into an excluded DIRECTORY, so a negation under
+# a bare `.gen-state/` could never apply.
+!.gen-state/.hashes.json
 
 # Per-target codegen output routed under .metaobjects/<target>/ is regenerable
 # (re-run `meta gen`); never commit it. The canonical output is your configured

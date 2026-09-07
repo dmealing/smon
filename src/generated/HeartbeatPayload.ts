@@ -9,6 +9,7 @@ export interface HeartbeatPayload {
   pingMs: number;
 }
 export type HeartbeatPayloadStatus = "up" | "down";
+export const HeartbeatPayloadStatusEnum = z.enum(["up", "down"]);
 export const HeartbeatPayloadInsertSchema = z.object({
   status: z.enum(["up", "down"]),
   msg: z.string().min(1),
