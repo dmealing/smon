@@ -9,10 +9,16 @@
 //
 // WHICH COMMAND CATCHES WHICH DRIFT (grep-verified against codegen/smon-provider.ts + the
 // render-helper `verify:` literal in src/generated/*.render.ts):
-//   - `@kind=email` mustache {{field}} <-> payload drift is SKIPPED by `meta verify --templates`
-//     (that gate only checks template.prompt drift). It is caught at `meta GEN` time by the
-//     render-helper's baked-in `verify:` field list -> ERR_VAR_NOT_ON_PAYLOAD. So the "rename a
-//     payload field" scenario (S1) asserts `meta gen` fails.
+//   - `@kind=email` mustache {{field}} <-> payload drift is caught TWICE, and S1 asserts both.
+//     At `meta GEN` time by the render-helper's baked-in `verify:` field list, and — since
+//     MetaObjects 1.0 — by `meta verify --templates`, which now body-checks a
+//     `template.output @kind=email` and names the direction it failed in
+//     ("[AlertEmail] (email/html) ERR_VAR_NOT_ON_PAYLOAD: enrichedBody").
+//     THIS IS A CHANGE, and asserting it is the point: through 0.15.x `verify` checked only
+//     `@textRef` prompt nodes and skipped the email class entirely, so `meta gen` + a
+//     clean-tree assertion was the ONLY thing standing between a renamed payload field and a
+//     silently-broken alert email. The second assertion below pins the coverage we gained so a
+//     regression cannot quietly take it away again.
 //   - The smon provider's own validate hooks (ERR_SMON_EMAIL_TEMPLATE_REQUIRED, ERR_SMON_TAG_GRAMMAR)
 //     and the built-in reference resolver (ERR_SMON_PAYLOAD_REF_UNRESOLVED) fire when the model is
 //     LOADED, which both `meta verify` and `meta gen` do — S2/S3/S4 assert `meta verify` fails.
@@ -85,7 +91,10 @@ describe("drift gate — the model is self-defending", () => {
       const tmp = makeTempRepo();
       const gen = runMeta(tmp, ["gen", "--dry-run"]);
       expect(gen.code).toBe(0);
-      const verify = runMeta(tmp, ["verify", "--prompts", "templates"]);
+      // The full gate set CI runs, not just the default subverb — otherwise this sanity
+      // check can pass while the gates CI actually runs are red on a clean tree.
+      const verify = runMeta(tmp, ["verify", "--templates", "--codegen", "--docs", "--prompts", "templates"]);
+      expect(verify.output).toContain("all clean");
       expect(verify.code).toBe(0);
     },
     T,
@@ -102,6 +111,23 @@ describe("drift gate — the model is self-defending", () => {
       expect(code).not.toBe(0);
       expect(output).toContain("ERR_VAR_NOT_ON_PAYLOAD");
       expect(output).toContain("enrichedBody");
+    },
+    T,
+  );
+
+  // S1b — the SAME mutation must also fail `meta verify --templates`, which since MetaObjects
+  // 1.0 body-checks `template.output @kind=email` (through 0.15.x it checked only @textRef
+  // prompt nodes and this scenario passed the gate). Both bodies that reference the field are
+  // named, each tagged with its direction; the subject template doesn't use it and is silent.
+  test(
+    "S1b: the same rename ALSO fails `meta verify --templates` (email bodies are gated since 1.0)",
+    () => {
+      const tmp = makeTempRepo();
+      mutate(tmp, "metaobjects/meta.monitor.json", '"name": "enrichedBody"', '"name": "enrichedBodyRenamed"');
+      const { code, output } = runMeta(tmp, ["verify", "--templates", "--prompts", "templates"]);
+      expect(code).not.toBe(0);
+      expect(output).toContain("[AlertEmail] (email/html) ERR_VAR_NOT_ON_PAYLOAD: enrichedBody");
+      expect(output).toContain("[AlertEmail] (email/text) ERR_VAR_NOT_ON_PAYLOAD: enrichedBody");
     },
     T,
   );
