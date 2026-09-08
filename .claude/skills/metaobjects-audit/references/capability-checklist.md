@@ -70,8 +70,11 @@ classify it (using the classification scheme in `SKILL.md`) and route the cutove
   name spelled as a literal outside its declaration — raw SQL, a hand-written repository, a
   migration script, a body-to-column map (drift signature 11). Every port emits a per-object
   names artifact from the declaration, so a literal is a second source of truth even when it
-  agrees with the naming strategy today. A typed ORM handle in its place is correct; on the
-  JVM an un-wired names generator is the finding first.
+  agrees with the naming strategy today. A typed ORM handle in its place is correct. **Check
+  the artifact is emitted at all before scoring the literals: on TypeScript and the JVM the
+  generator list in the config IS the complete list, so an existing project emits none and the
+  un-wired generator is the finding FIRST** (C# and Python have a real default suite and get it
+  by upgrading).
 - **`@kind` = `view` / `materializedView`** — hunt hand-written SQL views where an authored
   read-only source belongs. Apply the **view-necessity test** (SKILL.md, drift signature 8): a
   hand-written `CREATE VIEW` (or read-only SQL mirroring a read model) is a CODEGEN CANDIDATE when

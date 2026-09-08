@@ -6,6 +6,7 @@
 
 **Type:** `object.value`
 **Source:** `meta.monitor.json`
+**Package:** `smon`
 
 ## Fields
 
