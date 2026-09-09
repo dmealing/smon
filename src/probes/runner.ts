@@ -7,18 +7,28 @@
 // Pure TypeScript runtime glue for Task 12's sweep loop — no metaobjects machinery here.
 //
 // DELIBERATE DIVERGENCE FROM BASH (owner-approved): the bash reference has two latent parsing
-// bugs (see VERDICT_LINE_PATTERN below). smon is the source of truth for CORRECTNESS against
+// bugs (see matchVerdictLine below). smon is the source of truth for CORRECTNESS against
 // the published contract, not for byte-for-byte parity with bash's bugs, so both are fixed here
 // even though the bash script still has them.
 
+import { VerdictStatusEnum } from "../generated";
 import type { Verdict, VerdictStatus } from "../generated";
 import { PROBES, type ProbeName } from "../generated/probes/roster";
 
 const VERDICT_PREFIX = "verdict: ";
 
+// Escapes a member for safe use inside a regex alternation — identity for every current
+// Verdict.status member (OK, WARN, FAIL contain no metacharacters), but load-bearing the moment
+// a future member doesn't: an unescaped "." or "+" in the alternation would let the pattern match
+// strings that were never declared members at all.
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // The one correct pattern for a well-formed verdict line, straight from the published grammar
 // (verdict-contract.md §1 and §3): `verdict: <STATUS> <TAG> — <prose>` where STATUS is one of
-// OK|WARN|FAIL and TAG matches `^[A-Z][A-Z0-9_]{1,23}$` (starts with a letter, 2-24 chars total,
+// the declared Verdict.status members and TAG matches `^[A-Z][A-Z0-9_]{1,23}$` (starts with a
+// letter, 2-24 chars total,
 // digits legal). The separator is a literal " — " (space, em dash U+2014, space).
 //
 // Bash's reference implementation gets this wrong two ways that smon fixes rather than mirrors:
@@ -34,10 +44,32 @@ const VERDICT_PREFIX = "verdict: ";
 // smon parses status/tag/prose with a single regex built from the real grammar, and treats any
 // verdict line that doesn't match it (valid STATUS but a TAG that fails the grammar) as
 // malformed — the same FAIL/BAD_VERDICT shape already used for an invalid STATUS.
-const VERDICT_LINE_PATTERN = /^verdict: (OK|WARN|FAIL) ([A-Z][A-Z0-9_]{1,23}) — (.*)$/;
+//
+// The status alternation is built from `members`, never respelled here — production always calls
+// this with `VerdictStatusEnum.options`, the runtime constant `meta gen` emits for Verdict.
+// status's `@values`, so the set of legal statuses is declared exactly once
+// (metaobjects/meta.monitor.json) and this parser and the generated `VerdictStatus` union both
+// read that one declaration. Each member is regex-escaped before joining the alternation, and a
+// match's captured status is re-checked against `members` verbatim before being returned — a
+// member containing a regex metacharacter (say "X.Y") could otherwise make the alternation match
+// a string that isn't a member at all (e.g. "XZY"), which would flow out as a plausible-looking
+// non-member value with no error. Exported so the derivation is directly testable against an
+// arbitrary member set, not just the real `VerdictStatusEnum.options`.
+export function matchVerdictLine(
+  line: string,
+  members: readonly string[],
+): { status: string; tag: string; prose: string } | null {
+  const alternation = members.map(escapeRegExp).join("|");
+  const pattern = new RegExp(`^verdict: (${alternation}) ([A-Z][A-Z0-9_]{1,23}) — (.*)$`);
+  const match = line.match(pattern);
+  if (!match) return null;
+  const status = match[1] ?? "";
+  if (!members.includes(status)) return null;
+  return { status, tag: match[2] ?? "", prose: match[3] ?? "" };
+}
 
 function isVerdictStatus(value: string): value is VerdictStatus {
-  return value === "OK" || value === "WARN" || value === "FAIL";
+  return VerdictStatusEnum.safeParse(value).success;
 }
 
 /**
@@ -64,16 +96,17 @@ export function parseVerdict(stdout: string): Verdict {
     return { status: "FAIL", tag: "NO_VERDICT", prose: "probe emitted no verdict line" };
   }
 
-  const match = vline.match(VERDICT_LINE_PATTERN);
+  const match = matchVerdictLine(vline, VerdictStatusEnum.options);
   if (match) {
-    const status = match[1] ?? "";
-    const tag = match[2] ?? "";
-    const prose = match[3] ?? "";
-    return { status: status as VerdictStatus, tag, prose };
+    const { status, tag, prose } = match;
+    if (isVerdictStatus(status)) {
+      return { status, tag, prose };
+    }
   }
 
-  // Didn't fit the full contract shape. awk-style field splitting to figure out *why*, so the
-  // two malformed cases (invalid STATUS vs. missing TAG) keep their existing, distinct prose.
+  // Didn't fit the full contract shape (or, defensively, matched a status that isn't actually a
+  // declared member). awk-style field splitting to figure out *why*, so the two malformed cases
+  // (invalid STATUS vs. missing TAG) keep their existing, distinct prose.
   const fields = vline.trim().split(/\s+/);
   const status = fields[1] ?? "";
   if (!isVerdictStatus(status)) {

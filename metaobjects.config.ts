@@ -5,10 +5,17 @@ import { defineConfig } from "@metaobjectsdev/cli";
 // header doc-block for what it emits and how to customize it.
 import { entityFile } from "./codegen/generators/entity";
 import { barrel } from "./codegen/generators/barrel";
-// Stock (non-owned) generators consumed directly from the package — these wrap
-// the render engine for template.prompt / template.output nodes and don't need
-// per-project customization, so they aren't scaffold-and-own like the ones above.
-import { promptRender, renderHelper } from "@metaobjectsdev/codegen-ts/generators";
+// Stock (non-owned) generators consumed directly from the package.
+//   promptRender / renderHelper — wrap the render engine for template.prompt /
+//     template.output nodes; no per-project customization wanted.
+//   namesFile — the <Entity>Names artifact (the physical table/column names spelled
+//     ONCE, referenced everywhere else). It emits ZERO files here and that is correct,
+//     not a misconfiguration: every object smon declares is a sourceless object.value,
+//     so the project has no physical database names to spell. It is wired anyway so the
+//     artifact appears by itself the day an object gains a source.rdb, rather than being
+//     the thing nobody remembers to add. (The generator is SILENT about emitting nothing
+//     — `meta gen`'s file list simply does not mention it.)
+import { promptRender, renderHelper, namesFile } from "@metaobjectsdev/codegen-ts/generators";
 // smon's own metamodel vocabulary (Task 5) — adapter.notify + probe.bash.
 import { smonMonitorTypes } from "./codegen/smon-provider";
 // smon's own codegen (Task 7) — walks adapter.notify / probe.bash nodes and
@@ -22,14 +29,14 @@ import { monitorDocs } from "./codegen/generators/monitor-docs";
 export default defineConfig({
   outDir:    "src/generated",
   extStyle:  "none",
-  // dbImport/dialect are required by MetaobjectsGenConfig even though smon declares only value
-  // objects (no write-through entities), so no DB code is generated and these go unused. Kept to
-  // satisfy the type; the routes/queries generators + apiPrefix that WOULD consume them are removed.
-  dbImport:  "../db",
-  dialect:   "sqlite",
+  // No dbImport/dialect. Both used to be REQUIRED by the config type even for a project
+  // with no database, and this file carried two lies ("../db", "sqlite") to satisfy it.
+  // Since 0.24.3 each is demanded at the point of USE — by the generator that emits an
+  // import of it — so a model that generates no database code declares neither.
   providers: [smonMonitorTypes],
   generators: [
     entityFile(),
+    namesFile(),
     barrel(),
     promptRender(),
     renderHelper(),
@@ -38,8 +45,13 @@ export default defineConfig({
     monitorDocs(),
   ],
   docs: {
-    outDir:   "./docs",        // model + api surfaces both land here (run: meta docs)
+    outDir:   "./docs",        // every surface lands here (run: bun run docs)
     layout:   "flat",          // or "package" for multi-package models
-    surfaces: ["model", "api"],
+    // "agent" is the 1.0 surface .metaobjects/AGENTS.md tells a reader to consult before
+    // touching a tier. It currently emits NOTHING for smon — its three pages describe a
+    // physical schema, a generated UI and a requirement ledger, and smon has none of the
+    // three, so by the surface's own "an empty page is no file" rule no agent/ directory
+    // appears. Declared so it starts working on its own if that ever changes.
+    surfaces: ["model", "api", "agent"],
   },
 });

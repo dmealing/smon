@@ -5,21 +5,23 @@
   "private": true,
   "scripts": {
     "gen": "meta gen",
-    "verify": "meta verify --prompts templates",
+    "docs": "meta docs",
+    "verify": "meta verify --templates --codegen --docs --prompts templates",
     "test": "bun test",
     "build": "bun build src/cli.ts --target=node --outfile dist/smon.js"
   },
   "devDependencies": {
-    "@metaobjectsdev/cli": "0.15.18",
-    "@metaobjectsdev/codegen-ts": "0.15.18",
+    "@metaobjectsdev/cli": "1.0.0",
+    "@metaobjectsdev/codegen-ts": "1.0.0",
     "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
-    "@metaobjectsdev/metadata": "0.15.18",
-    "@metaobjectsdev/render": "0.15.18",
-    "@metaobjectsdev/runtime-ts": "0.15.18"
+    "@metaobjectsdev/metadata": "1.0.0",
+    "@metaobjectsdev/render": "1.0.0",
+    "@metaobjectsdev/runtime-ts": "1.0.0",
+    "zod": "^3.25.76"
   }
 }

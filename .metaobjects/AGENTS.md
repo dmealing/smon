@@ -8,15 +8,38 @@
 MetaObjects is a metadata standard: typed metadata in `metaobjects/` is the durable
 spine; generated code is the disposable artifact. Regenerate with `npx meta gen`.
 
+## Read the generated reference before you touch a tier
+`meta docs` writes four reference files under this project's docs output directory
+(`./docs` unless `docs.outDir` in `metaobjects.config.ts` says otherwise). They are
+generated from THIS project's metadata, so they describe what it actually is rather than
+what the framework does in general — and reading the relevant one first is how you avoid
+inferring the answer from generated code, which is the disposable half.
+
+- **`agent/schema.md`** — before touching persistence. Tables, columns, the field each
+  column came from, keys, foreign keys, constraints.
+- **`api/AGENT-API.md`** — before calling generated code. The types, endpoints and filter
+  operators the generators actually emitted.
+- **`agent/ui.md`** — before touching a form or a grid. The control, label, rules and
+  filterability per field, and each declared grid.
+- **`agent/requirements.md`** — before adding a capability. What is already claimed, and
+  what was deliberately **retired** — an entry saying a capability must not be rebuilt is
+  the one thing you cannot learn from the code, because the code is gone.
+
+Not there? Run `meta docs`. It reads the metadata and the config and needs nothing else.
+
 ## Principles
 - **Adopting onto existing code? Metadata FOLLOWS the code.** On a migration (existing working code / live DB), author metadata + tune codegen to *reproduce* what the code already is — native types (`field.uuid` when the code uses `UUID`, not `field.string`), names, nullability — so regen changes as little existing code as possible. The only existing code that should change is the hand-written layer codegen replaces; ask when a modeling choice is ambiguous. (Greenfield: model-first, below.)
-- Pattern-derivable from metadata = codegen, never hand-write — FKs, CRUD, validators, finders, and the database schema and migrations. The schema is a disposable, generated artifact: change the metadata and regenerate, never hand-write SQL.
-- The **live database** is a derived artifact too — never hand-apply a schema change to a running DB (ad-hoc `psql`/console `ALTER`/`CREATE`/`DROP`), not even to preview a column or unblock a boot. Apply schema only through `meta migrate` (metadata → DDL). A hand-applied change drifts the live DB from the metadata + migration history and collides at the next migrate/boot ("column already exists") — a state no migration can reproduce. Run `meta verify --db` after any DB-touching work to catch that drift early.
-- Never hand-edit generated files — change the metadata and regenerate (three-way merge preserves hand-written regions).
-- Use the generated constants for any string that names metadata.
+- Pattern-derivable from metadata = codegen, never hand-write — FKs, CRUD, validators, finders, and the database schema and migrations. The schema is a disposable, generated artifact: change the metadata and regenerate. Don't hand-write divergent SQL; where a stack owns its own migration files, GENERATE them — `meta migrate --migration-format flyway` emits the paired `V<n>__`/`U<n>__` files a Flyway runner expects, and leaves applying them to Flyway.
+- The **live database** is a derived artifact too — never hand-apply a schema change to a running DB (ad-hoc `psql`/console `ALTER`/`CREATE`/`DROP`), not even to preview a column or unblock a boot. Drive every schema change from the metadata, never ad-hoc: on the Node/TS-owned migrate stack that is `meta migrate` (metadata → DDL, ADR-0015); on a **Flyway**-owned JVM stack that is `meta migrate --migration-format flyway`, which emits the migration and deliberately refuses `--apply` because Flyway owns applying it. Hand-authoring a migration to match the generated schema is the LAST resort — for a runner MetaObjects has no writer for — never the default for Flyway. A hand-applied ad-hoc change drifts the live DB from the metadata + migration history and collides at the next migrate/boot ("column already exists") — a state no migration can reproduce. Run `meta verify --db <url>` after any DB-touching work to catch that drift early — the URL is required, and the bare form exits 2.
+- Never hand-edit generated **output** — change the metadata and regenerate. (That bounds the files codegen *emits*; it says nothing about the generator that emits them — next bullet.) What survives a regen DIFFERS BY TOOLCHAIN, so never rely on it: the Node/TS `meta gen` path three-way-merges, so an edit inside a generated file is preserved (and is refused rather than guessed at when it cannot tell yours from its own stale output); the JVM generators overwrite, and several Kotlin ones — including `<Entity>.kt` — truncate unconditionally with no marker check. Put your own code in a subclass or a separate file, never in the generated one.
+- **The generators are yours — editing one is ordinary work, not an escalation.** Your generator list, and any generator source scaffolded into your repo (`codegen/generators/` on the Node/TS path), are your code: no `@generated` header, no upstream ownership, nothing to ask permission for. **A standing rule not to change the MetaObjects repo is not a rule about your generators** — that is a different repository, and generalising the first into the second is how an agent ends up hand-writing the exact layer it was told to generate. When generated output does not fit, in order: change the **metadata** if the model is wrong; else change **your own generator**; only then hand-write. Hand-writing what the metadata already describes is the last resort, not the first. Per-port specifics — including which ports have an eject command and which mean implementing a generator interface — are in the `metaobjects-codegen` skill.
+- Use the generated constants for any string that names metadata — a type, subtype or attribute name, and a **physical table or column name**: those are declared once (`@table` / `@column`) and emitted as the per-object `<Entity>Names` artifact, so never respell one as a literal outside its declaration. Prefer a typed ORM handle where one exists; the constant is for raw SQL, migrations and logs.
+- **Ownership has a converse — wire a generator only for output you will actually consume.** Generated code nothing imports is indistinguishable from generated code that does not COMPILE — one adopter carried 87 uncallable query helpers through two audits because a dead-file census read them as over-generation. Worse, an unused generated file still reads as an invitation: a routes file nobody mounted still says "register this as-is for stock CRUD", so the next reader adopts the thing you decided not to. If an entity needs no REST surface, grid or form, don't wire that generator at all, or narrow it with the generator's own `filter` — don't emit the file and leave it unimported.
 - The loaded metadata model is READ-ONLY — never inject nodes or mutate the tree at load time (no "enrich the model on load" hooks). Need an extra field/column? Author it in the metadata, or derive it during codegen (read the metadata, emit output). Mutating the loaded model makes it diverge from what's declared — a bad practice reserved for very rare cases.
+- **JVM:** serialize a MetaObject-backed instance (a `pojoAware`-flavor generated class, a runtime `ValueObject`, or any `MetaObjectAware` type) through the MetaObjects JSON layer — never hand-configure a Jackson/Gson mapper around the framework fields to make a default mapper cope.
 
 ## Authoring rules you must not violate
+- **Search the vocabulary before concluding it cannot be expressed — `meta types <term>`.** An unregistered TYPE or SUBTYPE fails the load in every command. An undeclared `@attr` is different: it fails `meta verify`, which loads strict, and NOT `meta gen`, which does not — so an invented attribute passes codegen silently and is caught by the drift gate rather than by the build. Either way inventing vocabulary is a failure you will hit, not a shortcut. Search names with `meta types <term>`, names and descriptions with `--all` ("find it by what it does"), and one construct's valid `@attrs` with `meta types <type>.<subType> --detail`; `--format json` returns the same answer as one machine-readable document, each attr with its `allowedValues`. Rows marked `[ts-only]` are TypeScript-only vocabulary the cross-port contract does not carry. It is the Node `meta` CLI and, like `meta migrate`, works whatever your backend — it reads the registry, so it needs no project. Ask for NEW vocabulary only once that search comes up empty.
 - Nodes are fused-key maps: `{"<type>.<subType>": { ... }}` (e.g. `{"field.string": {"name": "email"}}`) — never split the type and subtype into separate keys.
 - Attribute names are unique within a node; for multi-value use one array attr (`@values: [...]`).
 - An inline `@maxLength: 50` equals an `attr` child of the same name — never write both.
@@ -24,6 +47,8 @@ spine; generated code is the disposable artifact. Regenerate with `npx meta gen`
 
 ## Keep all MetaObjects ports in sync
 MetaObjects ships as separate packages per language on DIFFERENT version lines (npm/PyPI/NuGet `0.x`/`1.x`, Maven Central `7.x`/`8.x`). Because the numbers differ by ecosystem, a stale port is INVISIBLE — an old TS client next to a new Java backend *looks* fine. Ports are only truly in sync when every one implements the same **Metamodel spec version** (`metamodelVersion`, on the registry manifest). Upgrade ALL ports together and confirm they land on the same Metamodel version; a lagging port silently disagrees on vocabulary + wire behavior.
+
+`metamodelVersion` is also the number that tells you whether YOUR METADATA needs work, separately from the package version, which tells you whether your BUILD does. A package major means imports/CLI/generated-code shape may need attention; a metamodel major means your model may. A release can move one without the other — so when you upgrade, read the changelog for a metamodel-version move, not just the package number.
 
 ## Going deeper (Claude Code)
 For authoring, codegen, runtime/UI, prompts, verify, or adoption-audit work, use the

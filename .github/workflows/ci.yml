@@ -3,18 +3,33 @@ name: CI
 # Four gates, run in this order because each catches a DIFFERENT class of drift/breakage:
 #
 #   1. `bun run gen` + assert no diff — regenerates src/generated/* and docs/generated/*
-#      from metaobjects/*.json and fails if the committed output doesn't match. This is
-#      the ONLY gate that catches @kind=email mustache<->payload drift
-#      (ERR_VAR_NOT_ON_PAYLOAD) — `meta verify` deliberately skips that class and only
-#      checks @textRef prompt nodes. Skipping this step would let an email template
-#      silently drift from its payload shape.
-#   2. `bun run verify` — the metaobjects drift gate proper (ERR_SMON_* validators over
-#      adapter.notify / probe.bash / template.prompt @textRef nodes).
+#      from metaobjects/*.json and fails if the committed output doesn't match. It is the
+#      gate that proves the COMMITTED output is what the metadata currently produces.
+#   2. `bun run verify` — the metaobjects drift gates. Three subverbs run, and each answers
+#      a question step 1 does not:
+#        --templates  every template BODY still resolves against its payload. Since
+#                     MetaObjects 1.0 this covers `template.output @kind=email` bodies,
+#                     not only `@textRef` prompt nodes — a renamed AlertPayload field now
+#                     fails here with `[AlertEmail] (email/html) ERR_VAR_NOT_ON_PAYLOAD`
+#                     as well as at gen time. (Before 1.0 `verify` skipped that class
+#                     entirely and step 1 was the only thing catching it; that is no
+#                     longer true, and the redundancy is deliberate belt-and-braces.)
+#                     It also runs the ERR_SMON_* provider validators over
+#                     adapter.notify / probe.bash, because both gates LOAD the model.
+#        --codegen    the committed generated files are the ones codegen wrote and a fresh
+#                     regen still emits them. Distinct from step 1: it reads
+#                     .metaobjects/.gen-state/.hashes.json (committed for exactly this
+#                     reason) so it can also tell a hand-edited generated file, and an
+#                     orphan we wrote but no longer emit, from a clean tree.
+#        --docs       the committed docs/*.md + docs/api/*.md still match a fresh
+#                     `meta docs`. Scoped to the pages `meta docs` owns — it correctly
+#                     leaves docs/generated/monitoring.md (a `meta gen` artifact) alone.
 #   3. `bun test` — the full unit/behavior suite (parser, runner, policy, notify adapters,
-#      enrichment, parity-oracle cases).
+#      enrichment, parity-oracle cases) INCLUDING test/drift.test.ts, which proves the two
+#      gates above actually bite by mutating a throwaway copy of this repo four ways.
 #   4. `bun run build` — produces dist/smon.js (bundled for node runtime semantics).
 #
-# gen and verify are NOT redundant — see the CI note in README.md's "Verify vs. gen" section.
+# gen and verify are NOT redundant — see the CI note in README.md's gates section.
 
 on: [push, pull_request]
 
@@ -50,7 +65,7 @@ jobs:
       - name: Assert generated output matches metadata (no diff)
         run: git diff --exit-code
 
-      - name: meta verify (metaobjects drift gate)
+      - name: meta verify (templates + codegen + docs drift gates)
         run: bun run verify
 
       - name: Test

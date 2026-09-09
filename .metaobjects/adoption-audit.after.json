@@ -1,0 +1,202 @@
+{
+  "schema": "metaobjects-adoption-audit/1",
+  "project": "smon",
+  "audited_at": "2026-09-07",
+  "audit_point": "post-upgrade (branch chore/metaobjects-1.0, MetaObjects 1.0.0-rc.4)",
+  "diffed_against": ".metaobjects/adoption-audit.before.json",
+  "versions": {
+    "declared": {
+      "@metaobjectsdev/cli": "1.0.0-rc.4",
+      "@metaobjectsdev/codegen-ts": "1.0.0-rc.4",
+      "@metaobjectsdev/metadata": "1.0.0-rc.4",
+      "@metaobjectsdev/render": "1.0.0-rc.4",
+      "@metaobjectsdev/runtime-ts": "1.0.0-rc.4",
+      "zod": "^3.25.76"
+    },
+    "resolved": {
+      "@metaobjectsdev/cli": "1.0.0-rc.4",
+      "@metaobjectsdev/codegen-ts": "1.0.0-rc.4",
+      "@metaobjectsdev/metadata": "1.0.0-rc.4",
+      "@metaobjectsdev/render": "1.0.0-rc.4",
+      "@metaobjectsdev/runtime-ts": "1.0.0-rc.4",
+      "zod": "3.25.76"
+    },
+    "resolved_verification": "read from node_modules/*/package.json, not from the declared ranges; `meta --version` prints 1.0.0-rc.4",
+    "ports_in_use": ["typescript"],
+    "cross_language_drift": "n/a — single port"
+  },
+  "scorecard": {
+    "headline_tier": "Exemplary",
+    "next_unmet_check": "nothing structural. The one axis genuinely absent is a requirement.* ledger, which is opt-in by design and was deliberately NOT authored during this pass.",
+    "pillars": [
+      { "pillar": "codegen", "tier": "Exemplary", "coverage": "all", "top_gap": "none — no dead generators, no unconsumed output, both copied reference templates re-synced to the 1.0 references, three custom generators clean under verify --codegen" },
+      { "pillar": "runtime", "tier": "n/a (mostly)", "coverage": "all-of-what-applies", "top_gap": "unchanged — no database, no ObjectManager; the applicable surface (render Provider + generated types) is fully wired" },
+      { "pillar": "drift", "tier": "Exemplary", "coverage": "all", "top_gap": "none — three verify subverbs (--templates, --codegen, --docs) plus gen+no-diff, plus 6 drift tests that prove the gates bite" },
+      { "pillar": "prompt", "tier": "Exemplary", "coverage": "all", "top_gap": "none, and the coverage got materially deeper: verify --templates now body-checks the two template.output @kind:email nodes it used to skip" }
+    ],
+    "ci_drift_gate_wired": true,
+    "ci_drift_gate_detail": "`bun run verify` is now `meta verify --templates --codegen --docs --prompts templates` — 4 gates run (templates, codegen, docs, requirements), all clean. CI still runs `bun run gen` + `git diff --exit-code` ahead of it."
+  },
+  "census": {
+    "metadata_lines": 225,
+    "custom_provider_lines": 277,
+    "smon_specific_generator_lines": 321,
+    "copied_reference_generator_lines_wired": 271,
+    "copied_reference_generator_lines_unwired": 0,
+    "generated_code_lines": 401,
+    "generated_code_files": 14,
+    "generated_docs_lines": 919,
+    "generated_docs_files": 23,
+    "handwritten_src_lines": 2036,
+    "test_lines": 2444,
+    "leverage_ratio": 1.21,
+    "leverage_ratio_note": "(401 generated code + 919 generated docs) / (225 metadata + 869 generator+provider) = 1.21x, up from 0.38x. The numerator grew because `meta docs` had never been run despite the project configuring a docs surface; the denominator dropped 202 lines of dead scaffolded generator. Still a low number for a MetaObjects adopter, and still the right number: smon's return is a loader-enforced vocabulary plus four gates, not code volume."
+  },
+  "audit_diff": {
+    "closed": [
+      {
+        "id": "gen-state-hashes-gitignored",
+        "how": "`.metaobjects/.gitignore` line 1 changed from `.gen-state/` to `.gen-state/*` + `!.gen-state/.hashes.json`, and the 16-line manifest is committed. THE TOOL FOUND THIS, not the reviewer: rc.4's `meta gen` printed the whole diagnosis unprompted, including the git subtlety that a negation under a bare excluded DIRECTORY can never apply. It also unblocked `verify --codegen`, which needs that manifest to distinguish a hand-edited generated file from a clean tree on a machine that did not generate it."
+      },
+      {
+        "id": "dead-scaffolded-generators",
+        "how": "codegen/generators/queries.ts and routes.ts deleted (202 LOC). They were not merely unused — `routes.ts` imported `CODEGEN_ATTR_EMIT_ROUTES`, removed in 0.25.0 with the @emit* retirement, and was the ONLY thing failing `tsc --noEmit` on the whole upgrade (TS2305). A file nothing imports still has to compile."
+      },
+      {
+        "id": "unused-db-config-keys",
+        "how": "`dbImport: \"../db\"` and `dialect: \"sqlite\"` deleted from metaobjects.config.ts. 0.24.3 moved the demand to the point of USE, so a model that generates no database code declares neither. `meta gen` output byte-identical without them."
+      }
+    ],
+    "rescored": [
+      {
+        "id": "dead-meta-common-json",
+        "from_tier": 3,
+        "to_tier": 4,
+        "reason": "Downgraded to advisory and deliberately NOT changed. Its bare `metadata` type key (rather than `metadata.root`) was this project's canary for 0.25.0's bare-key parser fix — the defect where four parsers answered a bare key three different wrong ways. VERIFIED WORKING at rc.4: dropping a real `object.value` into that file under the bare key emitted `src/generated/BareKeyProbe.ts`, so the key resolves through `defaultSubTypeOf` exactly as the YAML desugar always did. The file is an empty-but-functional placeholder; churning it on an upgrade branch buys nothing."
+      },
+      {
+        "id": "no-requirement-ledger",
+        "from_tier": 4,
+        "to_tier": 4,
+        "reason": "Unchanged and deliberately so. This project has zero requirement.* nodes; `meta verify`'s requirements gate runs and reports total 0. An absent ledger is not a defect, and a first one is not authored during an upgrade."
+      },
+      {
+        "id": "adapter-kind-axis-mixes-role-and-transport",
+        "from_tier": 4,
+        "to_tier": 4,
+        "reason": "Unchanged. Still advisory, still low confidence, still out of scope for an upgrade branch — it is a modeling change with a behavioural blast radius (src/cli.ts's kuma special-cases), not an upgrade fix."
+      }
+    ],
+    "new": [
+      {
+        "id": "enum-members-respelled-in-handwritten-code",
+        "title": "the Verdict.status member set was spelled three times in hand-written code; 1.0 gave it a runtime artifact and the project now derives all three",
+        "pillar": "codegen",
+        "surface": "validator",
+        "capability": "field.enum @values",
+        "locations": ["src/probes/runner.ts:38-52 (fixed)", "src/cli.ts:230,248 (fixed)"],
+        "evidence": "rc.4 emits `export const VerdictStatusEnum = z.enum([\"OK\",\"WARN\",\"FAIL\"])` for an INLINE field.enum — through 0.15.x only a package-level shared enum got a named artifact. Before that existed, runner.ts spelled the members inside VERDICT_LINE_PATTERN's regex alternation AND again in `isVerdictStatus`, and cli.ts twice restated the union as an inline type. Adding a fourth status to @values would have left the parser rejecting it as FAIL/BAD_VERDICT — a wrong-but-plausible verdict, not an error.",
+        "impact": "Both spellings retired. PROVEN in both directions on a throwaway copy: adding \"DEGRADED\" to @values and re-running `meta gen` made the parser accept `verdict: DEGRADED …` with ZERO hand-written lines changed; re-hardcoding \"OK|WARN|FAIL\" back into runner.ts makes the new test fail with the received value literally `BAD_VERDICT`. COST: importing a zod value into the CLI's module graph grew dist/smon.js from 61.5 KB / 39 modules to 181.6 KB / 58 modules (startup unchanged at 0.01-0.02s, below noise). Taken deliberately.",
+        "effort": "small",
+        "confidence": "high",
+        "next_command": "done in this pass",
+        "parity_gate": "test/parser.test.ts 'every declared Verdict.status member parses (the set is derived from the model)' — iterates VerdictStatusEnum.options, so it passes untouched when a member is added and fails when the list is re-hardcoded",
+        "tier": 1
+      },
+      {
+        "id": "zod-undeclared-in-manifest",
+        "title": "generated code imported zod and the manifest never declared it; it resolved only through a tool package's transitive dependency",
+        "pillar": "codegen",
+        "surface": "entity",
+        "capability": "generated Zod validators",
+        "locations": ["package.json (fixed)", "src/generated/*.ts:1 (import { z } from \"zod\")"],
+        "evidence": "`grep zod package.json` was empty while every generated value-object file starts `import { z } from \"zod\"`. It resolved because @metaobjectsdev/sdk carries a real `dependencies: { zod: ^3.23.0 }` that the installer hoists to node_modules/zod, and @metaobjectsdev/runtime-ts declares zod as an OPTIONAL peer — `peerDependenciesMeta.zod.optional === true` — so there is no install warning either.",
+        "impact": "Latent, not visible: bun/npm hoisting hides it, a strict layout would not, and it breaks the day `sdk` stops depending on zod. Fixed here by declaring `zod: ^3.25.76`. The upstream half is that nothing told the project: `meta init` learned to declare what generated output imports, but an ALREADY-initialized project gets no such signal from any command or gate.",
+        "effort": "trivial",
+        "confidence": "high",
+        "next_command": "reported upstream",
+        "parity_gate": "tsc --noEmit exit 0 with zod declared",
+        "tier": 1
+      },
+      {
+        "id": "docs-surface-configured-never-generated",
+        "title": "metaobjects.config.ts declared a docs surface that had never been run, so a third drift gate existed and was inert",
+        "pillar": "drift",
+        "surface": "entity",
+        "capability": "meta docs / verify --docs",
+        "locations": ["metaobjects.config.ts docs:", "docs/ (fixed)"],
+        "evidence": "`meta verify --docs` reported '23 of 23 page(s) differ from a fresh meta docs' — every one '+ … (a fresh meta docs emits it; not committed)'. docs/ held exactly one file, docs/generated/monitoring.md, which is smon's OWN generator's output.",
+        "impact": "23 pages generated and committed; `--docs` wired into `bun run verify` and green. The gate correctly scoped itself to the pages `meta docs` owns and left docs/generated/monitoring.md alone — the 0.24.3 jurisdiction rule applied one directory over.",
+        "effort": "small",
+        "confidence": "high",
+        "next_command": "done in this pass",
+        "parity_gate": "bun run verify — '23 docs page(s) match a fresh meta docs (no docs drift)'",
+        "tier": 2
+      },
+      {
+        "id": "names-artifact-is-a-verified-no-op-here",
+        "title": "namesFile() is wired and emits zero files, silently — correctly, because smon has no physical database names at all",
+        "pillar": "codegen",
+        "surface": "entity",
+        "capability": "<Entity>Names",
+        "locations": ["metaobjects.config.ts generators: namesFile()"],
+        "evidence": "With namesFile() wired, `meta gen` reports the same 14 files and no *.names.ts exists anywhere. Confirmed from the generator's own source: pass 1 is `ctx.entities.filter(ctx.matches)` over 'every matched object that participates in the database (#248)', and every smon object is a sourceless object.value. There is no message either way.",
+        "impact": "A Names-constant conversion is a VERIFIED no-op for this project: zero physical table/column/schema/index names exist to convert, and `git grep` finds no SQL of any kind. Kept wired so the artifact appears by itself if an object ever gains a source.rdb.",
+        "effort": "trivial",
+        "confidence": "high",
+        "next_command": "reported upstream (the silence, not the emptiness)",
+        "parity_gate": "n/a",
+        "tier": 4
+      },
+      {
+        "id": "agent-docs-surface-emits-nothing-here",
+        "title": "the 1.0 agent/ docs surface emits nothing for this project and says nothing about why, while the AGENTS.md it just scaffolded tells the reader to go read those pages",
+        "pillar": "drift",
+        "surface": "entity",
+        "capability": "meta docs agent surface",
+        "locations": [".metaobjects/AGENTS.md (scaffolded by meta init --refresh-docs)", "metaobjects.config.ts docs.surfaces"],
+        "evidence": "Adding \"agent\" to docs.surfaces changes `meta docs` output by nothing: '1 overview + 7 entity page(s) + 3 template page(s); 12 api page(s)'. No agent/ directory. That IS the designed rule ('AN EMPTY PAGE IS NO FILE') and it is right — smon has no schema, no UI and no ledger. But AGENTS.md says 'Not there? Run meta docs', and running it produces nothing and explains nothing.",
+        "impact": "PRODUCT-SIDE. Cost ~15 minutes tracing it through docs.js and agent-docs-file.ts to establish that silence meant 'correctly nothing' and not 'you configured it wrong'.",
+        "effort": "trivial",
+        "confidence": "high",
+        "next_command": "reported upstream",
+        "parity_gate": "n/a",
+        "tier": 4
+      },
+      {
+        "id": "render-helper-generator-inconsistencies",
+        "title": "the render-helper generator still ignores extStyle and still emits no @generated header",
+        "pillar": "codegen",
+        "surface": "prompt",
+        "capability": "renderHelper()",
+        "locations": ["src/generated/AlertEmail.render.ts:1,3", "src/generated/DigestEmail.render.ts:1,3"],
+        "evidence": "Unchanged from the BEFORE audit at rc.4. Line 1 is a bare `import { render } …` where every sibling generated file leads with `// @generated by @metaobjectsdev/codegen-ts — DO NOT EDIT.`; line 3 is `from \"./AlertPayload.js\"` while the barrel from the same run under the same `extStyle: \"none\"` emits `from \"./AlertPayload\"`.",
+        "impact": "Cosmetic here. Carried forward unchanged so the AFTER audit does not silently drop a finding the upgrade did not fix.",
+        "effort": "trivial",
+        "confidence": "high",
+        "next_command": "reported upstream",
+        "parity_gate": "n/a",
+        "tier": 4
+      }
+    ]
+  },
+  "gates_after": {
+    "gen": { "command": "bun run gen", "exit": 0, "result": "14 unchanged; antiPatterns total 0" },
+    "no-diff": { "command": "git diff --exit-code (post-commit)", "exit": 0 },
+    "verify": {
+      "command": "bun run verify  (= meta verify --templates --codegen --docs --prompts templates)",
+      "exit": 0,
+      "result": "3 template(s) clean; generated output in sync (no codegen drift); 23 docs page(s) match; 4 gate(s) ran, all clean"
+    },
+    "tests": { "command": "bun test", "exit": 0, "result": "141 pass, 0 fail, 12 files, 422 expect() calls (was 139/414)" },
+    "build": { "command": "bun run build", "exit": 0, "result": "Bundled 58 modules, dist/smon.js 181.64 KB (was 39 modules / 59.1 KB — zod entered the graph with the enum-constant conversion)" },
+    "typecheck": { "command": "./node_modules/.bin/tsc --noEmit", "exit": 0 }
+  },
+  "not_done": [
+    "No requirement.* ledger was authored — this project has none, and authoring a first one is not an upgrade task.",
+    "metaobjects/meta.common.json was left in place (empty, bare `metadata` key) — verified functional at rc.4 rather than churned.",
+    "The adapter.notify @kind role-vs-transport advisory was not acted on — it is a modeling change, not an upgrade fix.",
+    "`meta verify --db` and `--replay` were not run: smon has no database and no migrations. Both gates report ran=false.",
+    "No .env was needed or copied — smon reads only SMON_* env vars at runtime and no gate touches a database."
+  ]
+}

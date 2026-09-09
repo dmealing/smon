@@ -108,10 +108,18 @@ Generate code from the metadata model (regenerates `src/generated/*` and
 bun run gen
 ```
 
-Check that generated code hasn't drifted from the metadata:
+Check that generated code hasn't drifted from the metadata (three gates: template bodies,
+generated code, generated docs):
 
 ```bash
 bun run verify
+```
+
+Regenerate the model/API reference pages under `docs/` (`bun run verify` fails if the
+committed pages have drifted from the model):
+
+```bash
+bun run docs
 ```
 
 Run tests:
@@ -174,6 +182,12 @@ log-triage      FAILED_SERVICES, LOG_ERRORS, NOMINAL
 The same two tables, generated from the same metadata, are published as reference docs:
 
 - **Generated monitoring reference:** [`docs/generated/monitoring.md`](docs/generated/monitoring.md)
+  — emitted by `bun run gen` (smon's own `codegen/generators/monitor-docs.ts`).
+- **Generated model + API reference:** [`docs/README.md`](docs/README.md) and
+  [`docs/api/AGENT-API.md`](docs/api/AGENT-API.md) — emitted by `bun run docs`
+  (`meta docs`), one page per `object.value` and per template, plus a
+  call-it-exactly-as-written API page. Both directories are gated: `bun run verify`
+  regenerates them into a temp tree and fails on any difference.
 
 ## Status
 
