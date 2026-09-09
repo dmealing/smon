@@ -2,7 +2,7 @@
 //
 // parseVerdict is tested against the published contract (verdict-contract.md), not against the
 // bash `parse_verdict` reference's bugs. smon deliberately diverges from bash on two points
-// (see runner.ts's VERDICT_LINE_PATTERN comment): digits are legal in TAG (both for parsing and
+// (see runner.ts's matchVerdictLine comment): digits are legal in TAG (both for parsing and
 // for prose extraction), and a TAG that doesn't match the grammar `^[A-Z][A-Z0-9_]{1,23}$` is
 // rejected as malformed rather than accepted verbatim.
 //
@@ -15,7 +15,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseVerdict, runProbe } from "../src/probes/runner";
+import { matchVerdictLine, parseVerdict, runProbe } from "../src/probes/runner";
 import { VerdictStatusEnum } from "../src/generated";
 
 describe("parseVerdict", () => {
@@ -160,7 +160,7 @@ describe("parseVerdict", () => {
   });
 
   // The parser's legal status set is DERIVED from the model, not respelled here: runner.ts
-  // builds VERDICT_LINE_PATTERN's alternation and isVerdictStatus from the VerdictStatusEnum
+  // builds matchVerdictLine's alternation and isVerdictStatus from the VerdictStatusEnum
   // constant `meta gen` emits for Verdict.status's @values. This test asserts the derivation
   // rather than a literal list — add a fourth status to metaobjects/meta.monitor.json and it
   // passes untouched, while re-hardcoding "OK|WARN|FAIL" into runner.ts makes it fail.
@@ -174,6 +174,26 @@ describe("parseVerdict", () => {
     }
   });
 
+});
+
+describe("matchVerdictLine", () => {
+  // Regression for the unescaped-alternation gap: a member containing a regex metacharacter must
+  // not let the alternation match text that isn't actually one of the members. Before the fix,
+  // "." in "A.B" was an unescaped wildcard, so "verdict: AXB TAG — prose" matched with captured
+  // status "AXB" and was returned verbatim (a typed non-member value via an unchecked cast in the
+  // caller). After the fix, "." is escaped literally and the captured status is also checked
+  // against `members`, so a non-member is rejected outright.
+  test("a member with a regex metacharacter does not make a non-member string match", () => {
+    expect(matchVerdictLine("verdict: AXB TAG — prose", ["A.B", "C"])).toBeNull();
+  });
+
+  test("the literal member (with the metacharacter matched literally) still parses", () => {
+    expect(matchVerdictLine("verdict: A.B TAG — prose", ["A.B", "C"])).toEqual({
+      status: "A.B",
+      tag: "TAG",
+      prose: "prose",
+    });
+  });
 });
 
 describe("runProbe", () => {
