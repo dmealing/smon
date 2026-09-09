@@ -272,6 +272,15 @@ refused, path named, exit 1). So the merge is machine-local: a file you edited a
 pushed is REFUSED on a fresh clone or in CI, not merged. Recovery is in
 `docs/features/own-your-codegen.md`.
 
+A project with NO manifest at all (it predates the manifest being committed) is a
+different case with a different fix: every stale file refuses, and a run where everything
+refuses writes no manifest — so "commit `.hashes.json`" has nothing to commit. Run
+`meta gen --baseline=adopt` once: it records the files you have as the merge base and
+writes nothing, leaving exactly one file to commit; the next `meta gen` is then the
+regeneration, as its own reviewable diff. Adopting declares those files to BE generated
+output, so an edit already inside one is part of the base and that regeneration replaces
+it — `--baseline=fresh` + `git checkout` is the sequence that KEEPS an edit.
+
 Hand-customizations that metadata can't express go in a sibling module you create and
 import yourself — `<Entity>.extra.ts` by convention. The name carries no tool behaviour:
 the file is safe because codegen writes only the paths it records, and the generated

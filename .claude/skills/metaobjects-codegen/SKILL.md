@@ -36,6 +36,16 @@ You run a `gen` step. The runner:
      and the token, so an `@`-prefixed tag does not match it. Remove that token and
      regeneration never touches the file again.
 
+   **A refusal FAILS the run — exit 1 on every port** (TypeScript always did; Python and
+   C# warned and exited 0 until 1.0, so a `gen` wired into CI was green while codegen
+   refused to write). The one-time fix for a project that predates the committed manifest
+   is **`gen --baseline=adopt`**: it records the files you have as the baseline and writes
+   nothing, so there is finally a `.hashes.json` to commit — then `gen` again, and the
+   regeneration lands as its own diff. Adopting DECLARES those files to be generated
+   output, so an edit already inside one is part of the baseline and that regeneration
+   replaces it; commit before you run it. (TypeScript additionally has
+   `--baseline=fresh`: write fresh output now and discard the edits.)
+
    **The two rules protect a hand edit in opposite ways, so do not carry a habit across
    ports.** On TypeScript, C# and Python, *editing the content* is what takes ownership —
    that is what breaks the hash — and deleting the header changes nothing except your

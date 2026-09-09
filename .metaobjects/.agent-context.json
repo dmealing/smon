@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedBy": "1.0.0-rc.5",
+  "generatedBy": "1.0.0-rc.6",
   "servers": [
     "typescript"
   ],
@@ -10,8 +10,8 @@
     ".claude/skills/metaobjects-audit/references/capability-checklist.md": "4cd333586fbd9b74f8af1c9bcc8357ea4548347d4c4ea3d80388a956581a941a",
     ".claude/skills/metaobjects-audit/references/typescript.md": "dcde67b3cbc89d786cb861c03e12ea15b7158b311b73e86d6e0389b2e44f2126",
     ".claude/skills/metaobjects-authoring/SKILL.md": "883c68479c78ce75afa002103a9126a757c96d8ee88058e127dbbcb1e6ad1eb6",
-    ".claude/skills/metaobjects-codegen/SKILL.md": "76b0a816ba87d4811ad659cf34430b2b7565493686861a1254d65b4e6b0fd394",
-    ".claude/skills/metaobjects-codegen/references/typescript.md": "a413d498709bdb52741445adfb4785be9969cffd231890525c0ed4ee09c984b6",
+    ".claude/skills/metaobjects-codegen/SKILL.md": "cc6897d1523e7a230ac01548365436b791e7b25550f9d05812661b7e5c84cbcf",
+    ".claude/skills/metaobjects-codegen/references/typescript.md": "d54030a205cabb95ff0dcfb4769bac3257c4191c412f5f4d0503a45ad9142f88",
     ".claude/skills/metaobjects-prompts/SKILL.md": "f1170fd58aecefe50bfedc40e827b60728a76ad4f672208a3d325d490bd85bd3",
     ".claude/skills/metaobjects-prompts/references/typescript.md": "1b3bf9fd6246316869d37fbd59bf766cb99be1bfeae862d248400135adb5cf2b",
     ".claude/skills/metaobjects-runtime-ui/SKILL.md": "902d3201d2c8c719bd8d34080472782c89dd5c7bfbec5a0e27b3d1004b55e645",
