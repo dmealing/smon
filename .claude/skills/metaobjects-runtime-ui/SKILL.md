@@ -64,26 +64,61 @@ handle: raw SQL, a string-keyed query builder, and a hand-written repository on 
 whose generated model carries no persistence binding at all (Java, Python). Your server
 reference names the handle and the artifact for this stack.
 
-**First check the artifact exists — on TypeScript and the JVM it is opt-in, and an
-existing project almost certainly has none.** C# and Python emit it from a real default
-suite, so upgrading is enough. TypeScript's `generators: [...]` and the JVM's
-`<generators>` are each the COMPLETE list: `meta init` scaffolds `namesFile()` for a
-project initialized at 1.0, and upgrading the package never edits a config that was
-written earlier. Look for `<Entity>.names.ts` / `<Entity>Names` in the generated output
-before you write `ProgramNames.fields.x.column` against it; if it is not there, wiring the
-generator is the first step and the `metaobjects-codegen` skill says how. Writing raw SQL
+**First check the artifact exists — it is opt-in on EVERY port, and an existing project
+almost certainly has none.** Every port's generator list is now the COMPLETE list: C# and
+Python dropped their default suites (ADR-0034 Amendment 2), TypeScript's `generators: []`
+starts empty, and the JVM's `<generators>` never had a default. Upgrading the package
+never edits a config that was written earlier, so `names` arrives only when someone wires
+it. Look for `<Entity>.names.ts` / `<Entity>Names` in the generated output before you
+write `ProgramNames.fields.x.column` against it; if it is not there, wiring the generator
+is the first step and the `metaobjects-codegen` skill says how. Writing raw SQL
 with literal names because "there is no constant" is the loop this closes.
 
 ## The REST contract
 
 Generated (or hand-written) routes speak one cross-port HTTP contract so the same
-universal web client serves any backend language.
+universal web client serves any backend language. One part of the path grammar —
+the `<entity>` collection segment — is a known cross-port divergence (below);
+the verbs, filters, sort/pagination, and wire format are uniform.
 
 ### URL grammar
 
 `apiPrefix` (default `/api`, set in project config) flows to both the server routes
-and the client fetch URLs. `<entity>` is lowercased + pluralized (`Author` →
-`authors`).
+and the client fetch URLs.
+
+The `<entity>` collection segment is the **entity name `snake_case`d and then
+pluralized** — one rule, identical in all five ports, and derived from the NAME,
+never from the physical `@table`:
+
+| Name | Segment | Rule |
+|---|---|---|
+| `Author` | `authors` | a single regular word takes `s` |
+| `PostCategory` | `post_categories` | multi-word: the capitals carry the word boundary |
+| `Address` | `addresses` | ending `s`/`x`/`z`/`ch`/`sh` takes `es` |
+| `Category` | `categories` | consonant + `y` becomes `ies` |
+| `Day` | `days` | a VOWEL before the `y` does not |
+| `HTTPServer` | `http_servers` | a run of capitals stays together until the final one that begins a word |
+
+An `object.projection` uses the same rule, so `OrderSummary` is at
+`/order_summaries` either way. The generated web-client hooks and grids build
+their fetch URLs from the TypeScript `$path`, and every backend now mounts that
+same spelling, so a React/TanStack client works against any port's server.
+
+**This is a change, and it was a breaking one.** Each port used to spell the
+segment differently and they agreed only on single regular words — which was
+every collection base in the corpus, so all five lanes were green while
+`OrderSummary` was served at four different URLs: `/order_summaries` (TS entity),
+`/order-summaries` (TS projection), `/ordersummaries` (C#) and `/ordersummarys`
+(Java, Kotlin, Python). A project whose entity names are all single regular words
+saw nothing move. Any multi-word or irregular-plural name had its collection URL
+renamed, and clients had to follow.
+
+The rule is gated, not just documented: `fixtures/api-contract-conformance/m2m/`
+declares `PostCategory` — multi-word AND ending consonant+`y`, so it separates
+every spelling the ports used to produce — and asserts both retired spellings
+404, on each port's reference AND generated lane. The JVM ports share one
+implementation (`RouteNaming` in `codegen-base`); the acronym case is pinned by
+unit test in each port, since no corpus entity carries one.
 
 | Verb | Path | Purpose |
 |---|---|---|

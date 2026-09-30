@@ -97,6 +97,10 @@ only `--templates`; Java/Python's bare default runs only `--codegen` — either 
 paired with the advisory anti-pattern pass above, never all three subverbs. Treat a
 bare run as a smoke test: the real done-check is running the subverbs your project
 uses explicitly — `verify --codegen`, and, where a DB exists, `verify --db <url>`.
+The Node `meta verify` ends every run, bare or not, with a `not run:` line naming
+each gate it skipped and the flag that selects it; on a model with no templates a
+bare run checks nothing but the requirement ledger and still exits 0, so never
+wire a bare `meta verify` into CI as the whole gate.
 
 ## Requirements are checked on every run
 
@@ -105,9 +109,33 @@ If this project declares `requirement.functional` / `requirement.architectural` 
 `meta verify` — there is no subverb — and the severity of a broken link depends on the
 requirement's `@status`, which is the part that surprises people reading a failure.
 
+## The overlay authoring lint runs on every run, dependencies or not
+
+`meta verify` always runs an ADVISORY overlay lint, no subverb needed and
+regardless of whether this project declares `dependencies` in
+`.metaobjects/config.json` (`docs/features/metadata-dependencies.md`): a
+top-level `(type, resolutionKey)` declared in two or more collection files —
+dependency artifacts included when there are any, since they are the base a
+consumer's own files amend, but a plain multi-file **local** overlay (no
+dependencies at all — e.g. the layered-overlay pattern in `AGENTS.md`, or any
+project that re-opens its own node from a second file) triggers it exactly the
+same way — where MORE THAN ONE declaration lacks `overlay: true`. Exactly one
+unflagged declaration is the base and is fine; every additional one is a
+finding naming its file, because it is exactly the state that turns loud
+(`ERR_OVERLAY_NO_TARGET`) the day the target is renamed or removed, instead of
+quietly forking into a second, disconnected object. Never fails the build;
+mute it with `--no-overlay-lint` or `META_NO_OVERLAY_LINT=1` the same way the
+anti-pattern pass is muted.
+
+**A stale dependency snapshot is a load-time failure, not a `verify` finding.**
+If `.metaobjects/deps/<name>/` disagrees with `.metaobjects/deps.lock.json` — a
+missing snapshot, a hand-edited one, or a lock entry with no matching config
+declaration — every command (not just `verify`) fails to even LOAD the metadata,
+with `ERR_DEPENDENCY_SNAPSHOT_STALE` naming the fix: run `meta deps sync`.
+
 ## The `verify` subverbs
 
-`verify` has three drift checks. Run them in CI.
+`verify` has four drift checks. Run the ones your project uses in CI.
 
 - **`--db`** — schema drift. Introspects the live database and fails if it has
   diverged from metadata. This is a **schema concern, so it is the Node toolchain's
@@ -119,14 +147,37 @@ requirement's `@status`, which is the part that surprises people reading a failu
   gate, for every port.
 
 - **`--codegen`** — regeneration drift. Re-runs generation and diffs the result
-  against the committed generated files; a non-empty diff means someone edited
-  generated code or skipped a regen. Wire it into CI so a stale `@generated` file
-  fails the build.
+  against the committed generated files; a stale generated part (someone skipped a
+  regen) fails the build. Wire it into CI so a stale `@generated` file fails.
+  **A hand edit inside a generated file is NOT drift** — `meta gen` three-way-merges
+  hand edits by design, and the Node gate judges the *generated contribution* against
+  the committed `.metaobjects/.gen-state/.hashes.json`, not the bytes. So a weakened
+  validator passes this gate. The Node `meta verify --codegen` therefore LISTS every
+  generated file carrying a hand edit (count + paths, a notice that does not change
+  the exit code), and `--forbid-hand-edits` turns any hand edit into a failure for a
+  team that wants generated code untouchable. Read that list at review time. To see
+  one edit: delete the file, run `meta gen` (it re-emits the pristine generation),
+  then `git diff -R -- <file>`; `git checkout -- <file>` restores it. The one
+  exception is an `<Entity>.names.ts` artifact: a hand edit there always fails.
 
 - **`--templates`** — prompt/payload drift. For every `template.prompt` /
   `template.output`, resolves the text, parses each `{{...}}` reference, and fails
   if any reference isn't on the payload VO. This is the build-time gate for the
   prompt-construction pillar.
+
+- **`--deps`** — dependency drift (FR-023, **Node `meta` only** — but **any
+  backend**, like `--db`: the check reads only `.metaobjects/config.json` and has
+  no backend dependency of its own). Re-resolves each declared dependency's `path`
+  right now and compares its installed artifact's hash against
+  `.metaobjects/deps.lock.json` — the same comparison `meta deps check` runs. Only
+  TypeScript and Python additionally LOAD the resulting snapshot and honour the
+  default-exclusion it implies — a Java/Kotlin/C# project can run this gate today
+  even though its own codegen can't yet consume a dependency. Never part of the
+  bare-`verify` default: it
+  needs the publisher's `path` reachable, which CI checking out only your own repo
+  may not have. Reports `current` / `drifted` / `unresolved` per dependency;
+  `drifted` or `unresolved` fails with `ERR_DEPENDENCY_UPSTREAM_DRIFT`, fix is
+  "review the artifact diff, then `meta deps sync`."
 
 **Only `--db` is Node-universal.** `--codegen` / `--templates` run through each
 port's own build tool, not the Node `meta`:
@@ -218,7 +269,8 @@ What this means in practice:
   reading the same. Do **not** run `meta migrate baseline` on a database that does
   not exist yet; see `references/migration.md`.
 
-- Dialects: `postgres` (default), `sqlite`, and `d1` (Cloudflare D1, TS-only).
+- Dialects: `postgres` (default), `sqlite`, and `d1` (Cloudflare D1, TS-only). MySQL is a
+  codegen and runtime dialect only: `meta migrate --dialect mysql` is refused, and you own the DDL.
 - The JVM and Python ports have **no** migration command of their own — their
   former migrate goals/modules were removed, and (ADR-0015 Decision 2) the JVM
   runtime's own dev/test schema auto-create path

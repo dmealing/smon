@@ -27,7 +27,7 @@
 // here is a stub Task 9 must delete.
 
 import type { MetaData } from "@metaobjectsdev/metadata";
-import { formatTs, GENERATED_HEADER, type Generator } from "@metaobjectsdev/codegen-ts";
+import { formatTs, GENERATED_HEADER, GENERATED_EDIT_NOTE, type Generator } from "@metaobjectsdev/codegen-ts";
 
 const TYPE_ADAPTER = "adapter";
 const ADAPTER_SUBTYPE_NOTIFY = "notify";
@@ -78,7 +78,7 @@ function renderRegistryData(adapters: readonly MetaData[]): string {
   const sorted = [...adapters].sort((a, b) => a.name.localeCompare(b.name));
   const entries = sorted.map(renderAdapterEntry).join("\n");
 
-  return `// ${GENERATED_HEADER} — DO NOT EDIT.
+  return `// ${GENERATED_HEADER} — ${GENERATED_EDIT_NOTE}
 // Source metadata: adapter.notify nodes in metaobjects/meta.notify.json
 // Customize the shape by editing codegen/generators/notify-registry.ts.
 //
