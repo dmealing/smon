@@ -35,7 +35,9 @@ export default defineConfig({
   // import of it — so a model that generates no database code declares neither.
   providers: [smonMonitorTypes],
   generators: [
-    entityFile(),
+    // Import the HTTP-adapter types from the published package, not an owned copy under
+    // codegen/runtime/ (none is ejected here) — matters once an object gains a source.rdb.
+    entityFile({ runtimeImport: "@metaobjectsdev/runtime-ts" }),
     namesFile(),
     barrel(),
     promptRender(),
