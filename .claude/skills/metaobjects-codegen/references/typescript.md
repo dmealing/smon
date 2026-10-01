@@ -5,14 +5,45 @@ packages. Codegen runs through the Node `meta` CLI (`@metaobjectsdev/cli`, binar
 `meta`).
 
 ## Contents
+- Write your own generator
 - Install
 - `metaobjects.config.ts`
 - The generators
-- Declarative template-codegen (Mustache)
 - Run
 - Multiple output targets
 - Field subtype → column mapping
-- Retargeting to another framework — the TypeScript procedure
+
+Topic files beside this one, to open when they come up:
+`typescript-mysql.md` (a MySQL database), `typescript-document-store.md` (MongoDB or any
+store MetaObjects does not manage, with a tested repository generator),
+`typescript-retargeting.md` (a framework other than Fastify, Hono or React),
+`typescript-templates.md` (declarative Mustache template-codegen) and `typescript-docs.md`
+(`meta docs`). The procedure for any unsupported stack is `any-stack.md`.
+
+## Write your own generator
+
+For any output the model describes and no reference emits, start here:
+
+```bash
+meta generator new openapi --scope model   # entity (default) | package | model
+meta gen                                   # runs it — it already emits JSON per unit
+meta verify --codegen                      # gates it; nothing to register
+npx tsc -p tsconfig.codegen.json           # typecheck it; meta gen loads it untyped
+```
+
+`meta generator new <name>` writes `codegen/generators/<name>.ts` — a working, commented
+generator exporting `<camelName>Generator()` — and adds its import and entry to
+`metaobjects.config.ts` (when the config has one literal `generators: [...]`; otherwise it
+prints the two lines to add). It refuses a reference generator's name (eject that one
+instead) and never overwrites your file without `--force`. Then edit the emit.
+
+Everything a generator reads comes from `@metaobjectsdev/codegen-ts`: `perEntity` /
+`perPackage` / `perModel`, `isAbstract`, `hasAnyRdbSource`, `isProjection`,
+`servesReadApi` / `servesWriteApi`, `objectRefTarget`, `enumValues`, `effectivePackage`,
+`packageToPath`, `servedPath`, `toCamelCase` / `toPascalCase` / `toSnakeCase` /
+`pluralize`, and `formatTs` for TypeScript output. The config's `apiPrefix` is
+`ctx.renderContext?.apiPrefix`. Worked JSON Schema and OpenAPI 3.1 generators to copy:
+`docs/recipes/generators/typescript/` in the MetaObjects repository.
 
 ## Install
 
@@ -32,9 +63,13 @@ npm install --save-dev @metaobjectsdev/codegen-ts-react @metaobjectsdev/codegen-
 Codegen is wired in a type-checked TS config at the project root. `defineConfig`
 comes from `@metaobjectsdev/cli`; the generators come from their packages.
 
+`meta init` scaffolds this file with **`generators: []`** — nothing is generated until
+you choose it. Each import below appears once you `meta eject` that generator, which
+prints the exact line to add.
+
 ```ts
 import { defineConfig } from "@metaobjectsdev/cli";
-// Owned generators scaffolded by `meta init` (ADR-0034 scaffold-and-own).
+// Owned generators — copied in by `meta eject` (ADR-0034 scaffold-and-own).
 import { entityFile } from "./codegen/generators/entity";
 import { queriesFile } from "./codegen/generators/queries";
 import { routesFile } from "./codegen/generators/routes";
@@ -44,7 +79,7 @@ import { tanstackQuery, tanstackGrid } from "@metaobjectsdev/codegen-ts-tanstack
 
 export default defineConfig({
   outDir: "src/generated",
-  dialect: "postgres",                 // "postgres" | "sqlite" | "d1" (D1 is TS-only)
+  dialect: "postgres",                 // "postgres" | "sqlite" | "d1" | "mysql" (mysql: codegen + runtime; migrate does not own it)
   extStyle: "js",                      // "js" (default) for Node ESM / plain tsc; "none" for a bundler-resolution toolchain — see SKILL.md "Your framework isn't the default"
   apiPrefix: "/api",                   // flows to routes AND client fetch URLs
   columnNamingStrategy: "snake_case",  // "snake_case" (default) | "literal" | "kebab-case"
@@ -83,13 +118,21 @@ PROJECT ROOT that CONTAINS the metadata — never the metadata directory itself.
 
 ## The generators
 
-Server-side, framework-neutral. The first four are **scaffolded into your repo** by
-`meta init` and imported from `./codegen/generators/*` (ADR-0034) — 1.0 REMOVED their
-`@metaobjectsdev/codegen-ts/generators` export, so an owned copy is the only path. The
-engine primitives come from the package main entry, `@metaobjectsdev/codegen-ts`. The
-`/generators` subpath itself is NOT deprecated: it is the supported home of the generators
-with no ownable copy — `promptRender`, `outputParser`, `outputPrompt`, `extractor`,
-`renderHelper`, `traceHelperFile`, `routesFileHono`, `namesFile`, `callableFile`.
+Server-side, framework-neutral. **None is wired by default** — `meta init` writes
+`generators: []` and an empty `codegen/generators/`. `meta eject <name>...` copies the
+ownable ones into your repo, imported from `./codegen/generators/*` (ADR-0034); 1.0
+REMOVED their `@metaobjectsdev/codegen-ts/generators` export, so an owned copy is the only
+path for those. The engine primitives come from the package main entry,
+`@metaobjectsdev/codegen-ts`. The `/generators` subpath itself is NOT deprecated. It
+exports the prompt tier (`promptRender`, `outputParser`, `outputPrompt`, `extractor`,
+`renderHelper`) and `namesFile`, which you may import from there OR eject to own, and it is
+the only home of the package-only generators — `traceHelperFile`, `callableFile`,
+`requirementTests` — which ship no reference template (`meta gen --list` marks them
+`package-only`).
+
+The table below is a per-emission reference, NOT the selection surface. Select with
+`meta gen --list --format json --probe`, which is generated from the live registry and
+reports a file count for your own model; a table in a document cannot do either.
 
 | Generator | Emits per entity |
 |---|---|
@@ -104,7 +147,18 @@ with no ownable copy — `promptRender`, `outputParser`, `outputPrompt`, `extrac
 
 **Projections (read-only views).** For an `object.projection` (a read-only `source.rdb`
 `@kind: view` child), `entityFile()` emits a `pgView(...)` + read-only Zod + a read-only
-finder (no create/update/delete). The `CREATE VIEW` DDL is generated by `meta migrate`
+finder (no create/update/delete).
+
+Its REST surface is generated and READ-ONLY (F22): GET list + GET by id, the same
+`?filter[...]`/`?sort=` grammar as a table entity against allowlists built from the
+projection's OWN declared field set, and `POST` / `PATCH` / `PUT` / `DELETE` each
+answering `405 {"error": "method_not_allowed"}` — 405 and not 404 because the same
+path answers GET. A KEYLESS projection (no `identity.primary`) mounts no `/{id}` route
+at all, so it refuses only the collection verb.
+`routesFile()` mounts it through `mountReadOnlyCrudRoutes` from the drizzle-fastify
+adapter (your `codegen/runtime/` copy once ejected), which is where the refusals live.
+
+The `CREATE VIEW` DDL is generated by `meta migrate`
 from the projection's `origin.*` children — `origin.passthrough` (a forwarded column),
 `origin.aggregate` (`@agg` `count`/`sum`/`avg`/`min`/`max`, plus the #195 `any`/`all`
 predicate quantifiers over a `@filter` and `collect` array-rollup with optional
@@ -142,119 +196,6 @@ the discriminator as immutable — mirroring the generated per-subtype route's
 cross-subtype 404. Conformance-gated by `fixtures/api-contract-conformance/tph`
 (HTTP wire shape) and `fixtures/persistence-conformance/tph-*` (single-table
 runtime semantics).
-
-## Docs — `meta docs` (one door, three surfaces)
-
-Documentation is NOT a `meta gen` generator. The single door is the `meta docs`
-command, which emits three cross-linked **surfaces** under one output dir (default
-`./docs`):
-
-- **model surface** (`./docs/<Entity>.md`, `./docs/<Template>.md`) — the neutral
-  metadata reference: one page per entity and per template, including the linked
-  template-source section.
-- **api surface** (`./docs/api/<Entity>.md`, `./docs/api/README.md`,
-  `./docs/api/AGENT-API.md`) — the SDK/API reference: the concrete imports,
-  function signatures, payload field shapes, and runnable examples for *this*
-  project's generated code.
-- **requirements surface** (`./docs/requirements.md`, `./docs/requirements.toon`) —
-  the declared `requirement.*` ledger as documentation, with each entry headed by its
-  dotted path and its `title` where it has one, and each entity page naming the
-  requirements that claim it. Metadata-alone like the model surface, so it needs no
-  gen config. **On by default since 0.24.0** — a project declaring no `requirement.*`
-  nodes writes no requirements file and the run says nothing about the surface at all,
-  deliberately: reporting "0 requirement pages" would advertise a surface that never ran.
-
-```bash
-npx meta docs                     # all three → ./docs (model) + ./docs/api + ./docs/requirements.*
-npx meta docs --model             # model surface only
-npx meta docs --api               # api surface only
-npx meta docs --requirements      # requirement ledger only
-npx meta docs --out ./site-docs   # write under a different root
-```
-
-Other flags: `--layout flat|package`, `--base-url <url>`. Configure defaults in a
-`docs:` block in `metaobjects.config.ts` (`outDir`, `layout`, `baseUrl`,
-`surfaces`); CLI flags override it. The api surface needs the gen config
-(it documents what the codegen produced); with no config it is skipped with a note,
-and the model surface still emits from metadata alone.
-
-**Before calling any generated code, read `./docs/api/AGENT-API.md`** — it has the
-exact imports, signatures, payload field shapes, and runnable examples for this
-project's generated API, so you don't have to guess them.
-
-From `@metaobjectsdev/codegen-ts-react`: `formFile()` → `<Entity>.form.tsx`.
-From `@metaobjectsdev/codegen-ts-tanstack`: `tanstackQuery()` → `<Entity>.hooks.ts`
-(5 React Query hooks), `tanstackGrid()` → `<Entity>.columns.tsx`,
-`tanstackGridHook()` → `<Entity>.grid.tsx`.
-
-`entityFile({ allowlists: false })` drops the `runtime-ts/drizzle-fastify` import
-for edge/worker consumers that don't mount server routes.
-
-**Wire a generator only for output you consume, and narrow it with its `filter`.**
-Every generator factory takes `{ filter?: (entity) => boolean }`, ANDed with the
-generator's built-in gates — so it can only NARROW what emits, never widen it:
-`tanstackQuery({ filter: (e) => e.name !== "InternalAudit" })` emits no hooks for
-that entity. There is no `@emit*` metadata attribute to do this — `@emitTanstack`,
-`@emitRoutes`, `@emitForm`, `@emitGrid` and `@emitAngular` were never registered
-vocabulary, so they passed `meta gen` and failed `meta verify`. If a project carries
-one, `meta upgrade --apply` removes it.
-
-The one thing a `filter` can't express is opting a TPH subtype IN to its own
-per-subtype grid (that WIDENS): `tanstackGrid({ tphSubtypeGrids: (e) => … })`,
-default `() => false`. Pass the same predicate to `tanstackGridHook()` or you get
-a `<Sub>.grid.ts` whose `<Sub>.columns.tsx` is never emitted.
-
-## Declarative template-codegen (Mustache)
-
-Everything above is the **programmatic** path. A generator can also be **declarative** —
-a Mustache template plus a scope, no generator code — and on TypeScript you have both.
-Pick a template when the output SHAPE is what you are iterating on, or when you want the
-same output across languages; pick programmatic when the logic is gnarly or the run is
-hot.
-
-**There is no `--template-spec` flag on `meta gen`.** Do not look for one and do not
-report its absence as a gap. `metaobjects.config.ts` takes generator VALUES, so a
-template generator is declared there like any other — which is also what keeps it
-visible to `meta verify --codegen`, a gate that re-runs the config's generator list.
-
-```ts
-import { templateGenerator } from "@metaobjectsdev/codegen-ts";
-
-export default defineConfig({
-  generators: [
-    entityFile(),
-    templateGenerator({
-      name: "entity-service",
-      template: "service/entity-service",   // → templates/service/entity-service.mustache
-      scope: "perEntity",                   // "perEntity" | "perPackage" | "perModel"
-      outputPattern: "{package}/{Name}Service.ts",
-    }),
-  ],
-});
-```
-
-- `template` resolves under the project's `templates/` dir first, then framework defaults.
-- `outputPattern` placeholders: `{name}`, `{Name}`, `{package}` (its `::` segments become
-  nested directories). An unknown placeholder throws.
-- `scope` and `walk` are mutually exclusive — supply exactly one. `walk` is the escape
-  hatch for a walk none of the three scopes expresses.
-- Abstract objects are excluded from every scope.
-
-**Reusing a C#/Python spec.** Those ports declare the same generators as a JSON
-template-spec because their registries are closed and the flag is their only seam. Parse
-it and spread it:
-
-```ts
-import { parseTemplateSpec, templateSpecToGenerators } from "@metaobjectsdev/codegen-ts";
-
-const spec = parseTemplateSpec(JSON.parse(readFileSync("./template-spec.json", "utf8")));
-// generators: [entityFile(), ...templateSpecToGenerators(spec)]
-```
-
-Portability runs ONE way: TS also accepts a `target` field that the CLI ports reject, so
-a spec written there always runs here, but not the reverse. Keep `target` out of a shared
-spec. The data dict a template renders against is the cross-port byte-gated contract —
-`docs/features/codegen-data-shapes.md`.
 
 ## Run
 
@@ -324,106 +265,3 @@ The VO type, its Zod `InsertSchema`, and this `.$type<>()` all import the VO fro
 the same module (layout/package/`extStyle`-aware resolution). An opaque jsonb column
 (`field.string @dbColumnType: jsonb`) gets no `.$type<>()` — it stays `unknown`,
 which is the correct shape for freeform payloads with no fixed VO.
-
-## Retargeting to another framework — the TypeScript procedure
-
-This is the TypeScript implementation of the retargeting doctrine in SKILL.md
-("Your framework isn't the default"). Read that first for the order of moves;
-everything below — `meta eject`, `metaobjects.config.ts` keys, the exported
-`render*` functions — is Node-CLI-specific and exists only on this port.
-
-The shipped reference templates emit for **Fastify on Node** (plus a Hono variant) with
-Drizzle and Zod. If that is not your stack, retargeting is the **normal first move** — not
-a workaround and not a sign of a bug. Each template's header carries a `targets:` line
-naming exactly what its emit is coupled to and which call to swap.
-
-Work the list in order; the first two cost nothing.
-
-**1. Check the target-shaped config first.** Several apparent codegen failures are one
-config value in `metaobjects.config.ts`:
-
-- **`extStyle`** — `"js"` emits `./Entity.js` specifiers, correct for Node ESM and a plain
-  `tsc` with `nodenext`. Bundlers disagree on whether they perform the TypeScript
-  `.js`→`.ts` rewrite: it fails outright under **Turbopack** — including between two
-  generated files, which makes the whole generated tree unresolvable — while Vite and
-  esbuild are documented to accept it and webpack needs `resolve.extensionAlias` to do the
-  same. **If a generated import fails to resolve, set `extStyle: "none"` and retest** for
-  your toolchain rather than assuming either setting from this list.
-- **`clientDirective`** — `true` prepends `"use client";` to the generated form, hooks,
-  columns and grid-hook modules. Defaults to `false`. **Set it if your framework compiles
-  server and client from one tree** (React Server Components — Next.js App Router and
-  friends); leave it off otherwise, where the directive is inert and some bundlers warn
-  about it.
-- **`outDir`** / **`targets`** — where output lands, per generator.
-- **`apiPrefix`**, **`dialect`** — route mounting and column mapping.
-
-**2. Ask whether your framework splits the module graph.** Some frameworks compile server
-and client from one source tree and resolve each half under *different export conditions*
-(React Server Components, Angular universal, Qwik). Where they do:
-
-- a generated artifact using client-only APIs may need a **marker directive** or a distinct
-  import path, and
-- the resulting error frequently **names a package that is installed and present** — because
-  resolution failed under the server condition, not because the dependency is missing.
-
-Read that error as a *boundary* problem, not a dependency problem. The fix belongs in the
-generator that emits the artifact, which you own.
-
-**3. If the emit is wrong for your framework, own the generator.**
-
-    meta eject --list          # every template you can take ownership of
-    meta eject form            # copies it to codegen/generators/form.ts
-
-Then compose the engine and replace only the step that differs. Every generator's renderer
-is exported, so wrapping is available — but **how much that buys you differs by tier, and
-it is worth knowing which one you are in before you start**:
-
-- **Entity module (`entity`)** — genuinely composable. `renderDrizzleSchema`,
-  `renderZodValidators`, `renderInferredTypes`, `renderFilterAllowlist` and friends are
-  separate exported sections the template assembles into a `Code[]`. Swap or drop one and
-  keep the rest.
-- **Routes and UI (`routes`, `routes-hono`, `form`, `hooks`, `grid`, `grid-hook`)** — one
-  whole-file renderer each, so "replace a step" really means wrap the whole output. That
-  is enough for a marker directive, a header, or a post-process, and it is what the RSC
-  case below needs. It is **not** enough to retarget the emitted framework: if you need
-  Svelte or Angular instead of React, you are writing a renderer, and the honest move is
-  to keep the generator's metadata walk and replace the render call entirely.
-
-**`"use client"` needs no ejecting at all — it is a config knob.** The generated form,
-hooks, columns and grid-hook modules are client components; React Server Components
-frameworks (Next.js App Router and friends) require the directive saying so. Set it once:
-
-```ts
-export default defineConfig({
-  clientDirective: true,   // prepend `"use client";` to generated client artifacts
-  // ...
-});
-```
-
-Defaults to `false`, because the directive is only *required* under RSC and is inert
-(and warned about by some bundlers) everywhere else. It is applied ahead of the
-`@generated` header, exactly once, and only to the four client artifacts — the entity
-module, the query helpers and `<Entity>.meta.ts` are untouched, since `.meta.ts` is plain
-data and in RSC the boundary is the importing component, not everything it reaches.
-
-For the general wrap-the-output case — a directive or header MetaObjects does not model:
-
-```ts
-// codegen/generators/form.ts — OWNED
-import { renderFormFile } from "@metaobjectsdev/codegen-ts-react";
-
-// ...inside generate():
-if (!ctx.renderContext) throw new Error("renderContext is required (provided by runGen)");
-const body = renderFormFile(entity, ctx.renderContext);
-return { path, content: `// @my-framework:client\n` + body };
-```
-
-You keep receiving upstream fixes to `renderFormFile` while owning the one line your
-framework cares about. **Forking the whole renderer is the thing to avoid**, not owning the
-generator.
-
-**4. Server-tier output is usually already portable.** The entity module (a table plus
-validation schemas) and the query helpers (which take `db` as a parameter rather than
-importing a singleton) carry no HTTP-framework coupling — a server-rendered component can
-call a generated query directly. Retargeting is usually only needed at the routes and UI
-tiers.

@@ -1,6 +1,6 @@
 ---
 name: metaobjects-prompts
-description: Use when declaring or using MetaObjects prompt construction — template.prompt/template.output, typed payload projections, provider-resolved text, deterministic render, prompt-drift verify, and parser-on-receipt.
+description: Use when writing, editing or reviewing ANY code that builds text sent to an LLM (string formatting, f-strings, text blocks, template literals, string builders, concatenation) or reads an LLM reply (regex, string search, JSON or XML parsing), even in a test harness or script. In a project that declares a template.prompt, that code belongs in a template, a payload VO and a response model. Also for declaring template.prompt/template.output, typed payload projections, provider-resolved text, deterministic render, prompt-drift verify and parser-on-receipt.
 ---
 
 # MetaObjects prompt construction
@@ -13,6 +13,30 @@ machinery renders any text artifact: emails, exports, docs, `llms.txt`.
 
 This skill is port-agnostic. The exact render/parse API for *this* project's server
 language lives in a reference fragment (pointed to at the bottom).
+
+## Touching a hand-built prompt? Migrate it, don't extend it
+
+This skill applies to code that does not look like MetaObjects: a `String.format` or text
+block, an f-string, a template literal, a `StringBuilder`, or a string concatenation whose
+result is sent to an LLM, and a regex or string search that pulls fields out of the reply.
+Once a project declares any `template.prompt`, every LLM prompt should be one. When a task
+asks you to change a prompt that is still hand-built, **migrate it first, then make the
+change** — adding a line to the hand-built string is how a migrated codebase slides back.
+
+1. **Snapshot the current output.** Capture the exact text the existing code produces for
+   one or more representative inputs, as a test fixture.
+2. **Declare the payload.** An `object.value` for caller-supplied fields, or a sourceless
+   `object.projection` when fields are derived (see below). Only the fields the text uses.
+3. **Declare the `template.prompt`** and move the text into its external template file.
+   Values come from the payload, never from string formatting at the call site.
+4. **If the code reads the reply**, add `@responseRef` to a response model and replace the
+   regex or ad-hoc parsing with the generated extractor.
+5. **Render, then compare with the snapshot.** Keep it byte-identical. If a difference is
+   intended, review it on its own before you make the change the task asked for.
+6. **Then make the change** — in the template text or the payload.
+
+Look in every module, not only the application: test harnesses, simulators, evaluation
+scripts and tooling build prompts too, and a census scoped to "the app" misses them.
 
 ## The two template subtypes
 
@@ -130,10 +154,15 @@ table/key, collection/document). The prompt text itself **never lives in
 metadata** — at runtime a configured **provider** resolves the reference to the
 actual Mustache text:
 
-- a filesystem provider (L1 = folder, L2 = file) — the dev default;
-- an in-memory provider (a string map) — tests;
+- a filesystem provider (L1 = folder, L2 = file) — the dev default:
+  `lobby/welcome` → `<root>/lobby/welcome.mustache`. It is `FilesystemProvider` in every
+  port; in TypeScript it is Node-only and imported from a subpath so the package root
+  stays browser-safe — `import { FilesystemProvider } from "@metaobjectsdev/render/providers"`
+  (Python `metaobjects.render`, C# `MetaObjects.Render`, JVM `com.metaobjects.render`);
+- an in-memory provider (a string map) — tests (`InMemoryProvider`, from the package root);
 - a classpath/resource provider on the JVM;
-- or a consumer-supplied provider (RDB / vector store / …).
+- or a consumer-supplied provider (RDB / vector store / …) — implement `Provider`'s one
+  `resolve(ref)` method.
 
 Locale, A/B, dynamic, and evolutionary prompt variants all live behind the
 provider seam without touching metadata.
@@ -227,6 +256,18 @@ reader would raise or accept based on how much repair happened.
 The three-step consumer pattern is identical everywhere: render the prompt → call
 your LLM client → parse the reply with the generated parser.
 
+**Which parser for a raw model reply.** The strict parse expects the reply to BE the
+JSON document. A chat model's raw reply usually is not — `Sure!` followed by a fenced JSON
+block fails it outright (TypeScript: `invalid JSON: Unexpected token 'S'`). Use the strict parse
+only when the provider guarantees a bare JSON body (a structured-output / JSON mode). For a
+raw reply use the **tolerant extract**: it strips the prose and code fences, repairs what it
+can, and returns the data with a per-field report (recovered / defaulted / lost / malformed)
+instead of throwing on a bad reply; check the report's lost-required list (or call
+`orThrow` on the result, in the ports that ship it) when a lost `@required` field should be
+an error. The tolerant extract reads the LIVE metadata, so
+it takes a loaded root (or loader) as well as the text — its exact name and signature are in
+this port's reference below.
+
 ## A RESPONDING `template.prompt` generates the response-format fragment (FR-010)
 
 For every `template.prompt` whose `@responseRef` resolves, codegen additionally emits a
@@ -247,6 +288,11 @@ extractor agree on the same root name.
 | `guide` (default) | a prose field list ("Fill in each field…") followed by an example skeleton |
 | `inline` | a single skeleton whose field values are inline placeholders / enum choices |
 | `exampleOnly` | just a filled example skeleton, nothing else |
+
+A field's `@example` fills its slot in the skeleton. With none, a string/number shows a
+`{fieldName}` placeholder and an enum shows its allowed members
+(`"urgency": "low | medium | high"`) — never one pre-filled member, which a model copies
+into every reply. Declare `@example` when you do want a concrete value shown.
 
 Guidance is **never** emitted as code comments — models routinely ignore comments,
 so the instruction has to live in the rendered text itself.

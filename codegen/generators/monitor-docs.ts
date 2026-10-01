@@ -23,7 +23,7 @@
 
 import { relative } from "node:path";
 import type { MetaData } from "@metaobjectsdev/metadata";
-import { GENERATED_HEADER, type Generator } from "@metaobjectsdev/codegen-ts";
+import { GENERATED_HEADER, GENERATED_EDIT_NOTE, type Generator } from "@metaobjectsdev/codegen-ts";
 
 const TYPE_ADAPTER = "adapter";
 const ADAPTER_SUBTYPE_NOTIFY = "notify";
@@ -93,7 +93,7 @@ export function monitorDocs(): Generator {
     generate: (ctx) => {
       const adapters = ctx.loadedRoot.childrenOfSubType(TYPE_ADAPTER, ADAPTER_SUBTYPE_NOTIFY);
       const probes = ctx.loadedRoot.childrenOfSubType(TYPE_PROBE, PROBE_SUBTYPE_BASH);
-      const content = `<!-- ${GENERATED_HEADER} — DO NOT EDIT. -->
+      const content = `<!-- ${GENERATED_HEADER} — ${GENERATED_EDIT_NOTE} -->
 
 # Monitoring reference
 

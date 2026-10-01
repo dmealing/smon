@@ -46,6 +46,9 @@ value-sets against the constructs that replace them.
 
 ## Drift signatures (what to grep for)
 
+Rows are shapes worth a grep. Signature 11's rule row is applied to any shape that is not
+here — the table is its second pass, not its definition.
+
 | Signature | What it means |
 |---|---|
 | `pgTable(` / `sqliteTable(` outside `src/generated/` | hand-authored Drizzle table — candidate to generate |
@@ -54,15 +57,21 @@ value-sets against the constructs that replace them.
 | `// keep in sync with` / `// mirrors the` | second-source-of-truth comment — always a finding |
 | camelCase↔snake_case mapping tables | generated views handle this; diff field by field |
 | `@generated` file with hand edits | three-way merge preserves them; review at codegen; never delete |
-| a table/column string in a `sql` fragment, a Kysely identifier, or a migration/seed script outside the generated dir | second spelling of a declared physical name — reference `<Entity>.names.ts` (`ProgramNames.fields.<f>.column`): `generators: [...]` is the COMPLETE list and there is no default suite, so a project scaffolded before 1.0 emits NO names artifact and the missing `namesFile()` is the finding first; a Drizzle column object in its place is correct, not a finding |
+| **Signature 11, the rule — apply it before any row below:** a literal in non-generated code or config that must equal a value the metadata declares or a generator derives, at a site regeneration would NOT break | hunt VALUE-first: build one alternation from the values in `<Entity>.names.ts` + `<Entity>.meta.ts` (`$entity` / `$table` / `$path`; per-field `name` / `label` / `rules` / `options`) and grep the non-generated tree once, then trace each hit to its consumer. The rows below are the three commonest shapes, kept for the second pass — an already-drifted, concatenated or case-transformed literal a value grep cannot see. A shape not listed (a GraphQL field, a queue topic, a cache key, a `COPY` header) is scored by the rule, not skipped |
+| a table / column / index string in a `sql` fragment, a Kysely identifier, or a migration/seed script outside the generated dir | second spelling of a declared physical name — reference `<Entity>.names.ts` (`ProgramNames.fields.<f>.column`, `.indexes.<k>.index`): `generators: [...]` is the COMPLETE list and there is no default suite, so a project scaffolded before 1.0 emits NO names artifact and the missing `namesFile()` is the finding first; a Drizzle column object in its place is resolved, not a finding |
+| the resource path in an API call or mount — `app.get("/subscribers")`, the `/subscribers` inside `fetch("/api/subscribers")`, a TanStack `queryKey` path | second spelling of `$path` on the entity module and its `.meta.ts` twin. The `/api` prefix is NOT part of the finding: the constants surface deliberately carries no prefix member — it is the provider's `baseUrl`, a deployment fact — so the prefix has no constant by design and is never a gap either |
+| a field name passed as text where the parameter's type is a bare `string` — `sort: "created_at"`, `filter["email"]`, a column-id string in a grid config | the per-field constants object carries `name`. Check the parameter type first: where the generated hook types it as a union of field names it is resolved and this row does not apply, exactly as a typed property access does not |
+| a form label or a validation limit/message re-typed in hand JSX or a hand validator (`maxLength={255}`, `"Email is required"`) | derived from `@title` and the field's validator children into `label` / `rules`; the hand copy is a second source of truth |
+| **NOT a finding — the rule's consequences, not a list:** anything RESOLVED (a typed handle, a typed property access, a typed filter key, an enum member narrowed by the generated `export type <Entity><Field>` union — measured: 332 such literals on one estate, 0 real) and anything the metadata does not OWN (a page route or link, `<Route path="/programs">` / `<a href="/programs">` — 11 apparent `$path` hits on another estate, 0 real; the deployment prefix above) | rewriting a resolved reference to a string lookup is a regression; converting a page route couples the site's URL structure to the API's. Emitted `options: [...] as const` populates a dropdown, not replaces checked literals. A shape that is neither resolved nor unowned and has a constant → score it, whatever it is |
 
 ---
 
 ## Owned generators — scaffold-and-own (ADR-0034)
 
-`meta init` copies the reference generator templates into the project at
-`codegen/generators/*.ts`. The scaffolded `metaobjects.config.ts` imports the
-**owned** local copies:
+`meta eject <name>...` copies the reference generator templates a project chooses into
+`codegen/generators/*.ts`. Since 1.0.4 `meta init` scaffolds that directory EMPTY with
+`generators: []` (a project initialised on an earlier CLI got four wired copies, so both
+shapes are normal). `metaobjects.config.ts` imports the **owned** local copies:
 
 ```ts
 import { entityFile } from "./codegen/generators/entity";
@@ -78,9 +87,11 @@ import { entityFile, queriesFile, routesFile, barrel } from "@metaobjectsdev/cod
 ```
 
 **Do NOT flag the subpath itself.** `@metaobjectsdev/codegen-ts/generators` is the supported,
-non-deprecated home of the generators that have no ownable copy — the prompt/output tier
-(`promptRender`, `outputParser`, `outputPrompt`, `extractor`, `renderHelper`,
-`traceHelperFile`) plus `routesFileHono`, `namesFile` and `callableFile`. The CLI's own
+non-deprecated home of the generators it still exports — the prompt/output tier
+(`promptRender`, `outputParser`, `outputPrompt`, `extractor`, `renderHelper`),
+`traceHelperFile`, `routesFileHono`, `namesFile` and `callableFile`. The prompt tier can
+also be ejected (`meta eject prompt-render`), but owning it is optional; `traceHelperFile`
+and `callableFile` are package-only and this subpath is their only home. The CLI's own
 prompt-gate warning tells adopters to import `promptRender` from exactly this path. A
 project importing those from it is CORRECT, and reporting it as un-adopted scaffold-and-own
 is a false finding.

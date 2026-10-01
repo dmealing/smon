@@ -18,7 +18,14 @@ stays native to the language.
 
 ```bash
 npm install --save-dev @metaobjectsdev/cli @metaobjectsdev/migrate-ts
+npm install --save-dev pg                       # Postgres
+npm install --save-dev @libsql/kysely-libsql    # SQLite under Node (Bun needs nothing)
 ```
+
+Install the driver in the **same package** as `@metaobjectsdev/cli`: the CLI loads it
+from its own install location. In a monorepo that is the package that depends on the CLI,
+not necessarily the one that runs your app. D1 needs no driver here (it goes through
+Wrangler).
 
 You point the tool at the **same database your server connects to** — its
 connection is independent of your runtime tier.
@@ -253,6 +260,17 @@ schema without a rewrite:
 
 ## Not yet shipped
 
-Triggers, generated columns, exclusion + CHECK constraints, MySQL, and data
-migrations (column-type changes needing data transformation error out with a hint).
-(Partial + descending **indexes** *are* supported — see Index modeling above.)
+Triggers, generated (computed) columns, exclusion (`EXCLUDE`) constraints, MySQL
+(the dialects are `postgres`, `sqlite` and `d1`), and data migrations: a column type
+change IS emitted (Postgres `ALTER COLUMN … TYPE` with the `USING` conversion the cast
+needs; SQLite rebuilds the table), but a change that needs a data transformation
+beyond a cast — a backfill, a split or merge of columns — is yours to write.
+
+What *is* shipped, since this list used to say otherwise: **CHECK constraints are
+emitted, created, diffed and dropped** — derived from the model, never written as raw
+SQL. `field.enum` membership (`IN (…)`, the mapped integers for an `@intValueMap`
+enum), `validator.numeric` min/max, `validator.length` min/max, `validator.regex`
+(Postgres only — SQLite has no regex operator), and the entity-level cross-field
+validators (`comparison`, `requiredWhen`, `presentIff`, `atLeastOne`) each become a
+named `CHECK`. Array columns get none (the element rules are enforced app-side).
+(Partial + descending **indexes** are supported too — see Index modeling above.)

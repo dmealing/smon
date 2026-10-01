@@ -13,8 +13,8 @@ import { barrel } from "./codegen/generators/barrel";
 //     not a misconfiguration: every object smon declares is a sourceless object.value,
 //     so the project has no physical database names to spell. It is wired anyway so the
 //     artifact appears by itself the day an object gains a source.rdb, rather than being
-//     the thing nobody remembers to add. (The generator is SILENT about emitting nothing
-//     — `meta gen`'s file list simply does not mention it.)
+//     the thing nobody remembers to add. (Since 1.0.x `meta gen` reports it on every run
+//     as "1 wired generator(s) matched nothing and wrote no file: names" — expected here.)
 import { promptRender, renderHelper, namesFile } from "@metaobjectsdev/codegen-ts/generators";
 // smon's own metamodel vocabulary (Task 5) — adapter.notify + probe.bash.
 import { smonMonitorTypes } from "./codegen/smon-provider";
@@ -35,7 +35,9 @@ export default defineConfig({
   // import of it — so a model that generates no database code declares neither.
   providers: [smonMonitorTypes],
   generators: [
-    entityFile(),
+    // Import the HTTP-adapter types from the published package, not an owned copy under
+    // codegen/runtime/ (none is ejected here) — matters once an object gains a source.rdb.
+    entityFile({ runtimeImport: "@metaobjectsdev/runtime-ts" }),
     namesFile(),
     barrel(),
     promptRender(),

@@ -10,7 +10,7 @@
 //             are owned here.
 
 import type { MetaData } from "@metaobjectsdev/metadata";
-import { formatTs, GENERATED_HEADER, type Generator } from "@metaobjectsdev/codegen-ts";
+import { formatTs, GENERATED_HEADER, GENERATED_EDIT_NOTE, type Generator } from "@metaobjectsdev/codegen-ts";
 
 const TYPE_PROBE = "probe";
 const PROBE_SUBTYPE_BASH = "bash";
@@ -51,7 +51,7 @@ function renderRoster(probes: readonly MetaData[]): string {
     .map(({ key, body }) => `  ${JSON.stringify(key)}: {\n${body}\n  },`)
     .join("\n");
 
-  return `// ${GENERATED_HEADER} — DO NOT EDIT.
+  return `// ${GENERATED_HEADER} — ${GENERATED_EDIT_NOTE}
 // Source metadata: probe.bash nodes in metaobjects/meta.notify.json
 // Customize the shape by editing codegen/generators/probe-roster.ts.
 

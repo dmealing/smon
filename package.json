@@ -11,17 +11,17 @@
     "build": "bun build src/cli.ts --target=node --outfile dist/smon.js"
   },
   "devDependencies": {
-    "@metaobjectsdev/cli": "1.0.0",
-    "@metaobjectsdev/codegen-ts": "1.0.0",
+    "@metaobjectsdev/cli": "1.0.10",
+    "@metaobjectsdev/codegen-ts": "1.0.10",
     "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
-    "@metaobjectsdev/metadata": "1.0.0",
-    "@metaobjectsdev/render": "1.0.0",
-    "@metaobjectsdev/runtime-ts": "1.0.0",
+    "@metaobjectsdev/metadata": "1.0.10",
+    "@metaobjectsdev/render": "1.0.10",
+    "@metaobjectsdev/runtime-ts": "1.0.10",
     "zod": "^3.25.76"
   }
 }

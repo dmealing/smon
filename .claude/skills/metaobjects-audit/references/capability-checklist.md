@@ -71,10 +71,12 @@ classify it (using the classification scheme in `SKILL.md`) and route the cutove
   migration script, a body-to-column map (drift signature 11). Every port emits a per-object
   names artifact from the declaration, so a literal is a second source of truth even when it
   agrees with the naming strategy today. A typed ORM handle in its place is correct. **Check
-  the artifact is emitted at all before scoring the literals: on TypeScript and the JVM the
-  generator list in the config IS the complete list, so an existing project emits none and the
-  un-wired generator is the finding FIRST** (C# and Python have a real default suite and get it
-  by upgrading).
+  the artifact is emitted at all before scoring the literals: on every port the selection IS
+  the complete list — the config's on TypeScript and the JVM, `--generators` on C# and Python —
+  so an existing project emits none and the un-wired generator is the finding FIRST** (no port
+  ships a default suite; ADR-0034 Amendment 2). **This entry is the physical-name INSTANCE of signature 11.** The rule that
+  generates the rest — and the reason an enum member compared as a bare string is NOT one — is
+  the Cross-cutting entry below.
 - **`@kind` = `view` / `materializedView`** — hunt hand-written SQL views where an authored
   read-only source belongs. Apply the **view-necessity test** (SKILL.md, drift signature 8): a
   hand-written `CREATE VIEW` (or read-only SQL mirroring a read model) is a CODEGEN CANDIDATE when
@@ -224,8 +226,10 @@ artifact for a person or a file and generates **no parser**.
 
 The only axis here whose hunt is not "hand-written code the metadata describes" but
 **hand-written PROSE that claims something about the code and nothing checks.** Two
-subtypes with opposite polarity: `requirement.functional` fails when NOTHING implements it
-(existence); `requirement.architectural` fails when something VIOLATES it (universality).
+subtypes with opposite polarity: `requirement.functional` is checked for existence (`meta verify`
+warns when nothing implements it, and fails when a node it names is gone);
+`requirement.architectural` is checked for universality (`meta verify` fails a live policy applied
+to nothing, and does not check that each claimed node complies).
 
 - `requirement.functional` — `@statement`, `@status`, `@level`, `@counterexample` — hunt a
   `CAPABILITIES.md`, a features table in a README, a `docs/status/` tree, or a spreadsheet
@@ -269,6 +273,43 @@ subtypes with opposite polarity: `requirement.functional` fails when NOTHING imp
   internal-only rationale slot — never emitted to user-facing doc-gen.)
 
 ## Cross-cutting
+
+- **Open JSON bag vs a shape the readers already know (drift signature 12).** `field.string`
+  + `@dbColumnType: jsonb` is the SANCTIONED untyped-column escape hatch (emits `unknown`,
+  gated by `fixtures/api-contract-conformance/jsonb/`) — never a finding on sight. It is a
+  finding only when the code knows the shape. **Check the WRITER first** — the function writing
+  the column declares the type (`related_memory_ids: list[str]`, `vector_scores: list[float]`, a
+  serialized DTO); a reader-only hunt under-counts badly, because raw-SQL JSON paths are the
+  rarest way to consume jsonb. Reader tells second: fixed-key `->>'key'` reads, casts, typed
+  parsing (`model_validate` / `readValue` / `decodeFromString`), a hand validator. **Commonest
+  sub-case, and mechanical: a writer typed `list[str]` / `string[]` / `List<X>` means the base
+  subtype + `isArray: true`, never an object and never an open bag** — a plural name plus a typed
+  collection is the whole test. A `*Json` suffix is a second free tell. Remedy ladder by the writer's
+  type: `list[X]` → base subtype + `isArray`; `dict[str, X]` with a known X → **`field.map` +
+  `@objectRef`** (emits `.$type<Record<string, X>>()` / `z.record`); a serialized DTO → `object.value`
+  + `field.object @objectRef @storage: jsonb`; only `dict[str, Any]` with no key-pinning readers stays
+  open. Every typed rung yields a TYPED HANDLE — Drizzle `.$type<VO>()` + Zod, a Pydantic model, a
+  typed Exposed jsonb codec — never a JSON string the consumer casts. Remedy: an `object.value` +
+  `field.object` `@objectRef` `@storage: jsonb` — the column stays jsonb. Not a finding for a
+  pass-through bag, a third-party/LLM raw response, or an array of scalars (`isArray`).
+
+- **A metadata-derived value spelled a second time (drift signature 11 — one rule, not two halves).**
+  A literal in non-generated code or config that must EQUAL a value the metadata declares or a
+  generator derives is a second spelling. The constants to reference: `<Entity>Names` (physical
+  table / schema / column / index names) on all five ports; on TypeScript also the entity module's
+  `$entity` / `$table` / `$path` and per-field `name` / `label` / `view` / `htmlType` / `rules` /
+  `options`, with the browser-safe `<Entity>.meta.ts` twin, whose docblock says to use them INSTEAD
+  of magic strings — the other four ports answer that surface with a generated typed handle
+  (Pydantic attribute, EF property, Exposed `Column`), already the gold standard. **Hunt VALUE-first**
+  — grep the non-generated tree, config included, for the values those artifacts carry, and trace each
+  hit to its consumer — and **score only a site regeneration would not break.** Resolved references
+  (typed handles, property access, typed filter keys, enum members narrowed by the generated union —
+  332 literals, 0 findings on one estate) and values the metadata does not own (a page route or link —
+  11 apparent hits, 0 real; the `/api` deployment prefix, which is `baseUrl` and deliberately not a
+  constant) are exempt as consequences of that rule, not as a list. Raw SQL, the API resource path and
+  the hand-built form are the three commonest shapes, never the set; a GraphQL field, a queue topic, a
+  cache key or a `COPY` header scores by the same rule. Procedure, the emitted-vs-adopted ratio and the
+  deferral rule: SKILL.md signature 11.
 
 - **`extends`** (any depth, cross-package `::`) — hunt copy-pasted base-entity field blocks
   that should be an abstract base inherited via `extends` (the inheritance mechanism;
