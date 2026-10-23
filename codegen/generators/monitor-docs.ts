@@ -13,7 +13,7 @@
 // carries host data (see codegen/smon-provider.ts), so this can't leak any.
 
 import type { MetaData } from "@metaobjectsdev/metadata";
-import { GENERATED_HEADER, GENERATED_EDIT_NOTE, type Generator } from "@metaobjectsdev/codegen-ts";
+import { GENERATED_HEADER, GENERATED_EDIT_NOTE, type Generator } from "@metaobjectsdev/codegen-ts/engine";
 
 const TYPE_ADAPTER = "adapter";
 const ADAPTER_SUBTYPE_NOTIFY = "notify";

@@ -108,8 +108,8 @@ Generate code from the metadata model (regenerates `src/generated/*` and
 bun run gen
 ```
 
-Check that generated code hasn't drifted from the metadata (three gates: template bodies,
-generated code, generated docs):
+Check that generated code hasn't drifted from the metadata (two gates: template bodies,
+generated code including the docs pages):
 
 ```bash
 bun run verify
@@ -119,7 +119,7 @@ Regenerate the model/API reference pages under `docs/` (documentation is a gener
 `bun run gen` writes them; `bun run verify` fails if the committed pages have drifted from the model):
 
 ```bash
-bun run docs   # alias of `bun run gen`
+bun run gen
 ```
 
 Run tests:
@@ -187,7 +187,7 @@ The same two tables, generated from the same metadata, are published as referenc
   [`docs/api/AGENT-API.md`](docs/api/AGENT-API.md) — emitted by `bun run gen`
   (`docsFile()` / `apiDocsFile()`), one page per `object.value` and per template, plus a
   call-it-exactly-as-written API page. Both directories are gated: `bun run verify`
-  regenerates them into a temp tree and fails on any difference.
+  fails when the model changes without a regen (CI's `bun run gen` + no-diff step catches hand edits).
 
 ## Status
 

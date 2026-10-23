@@ -5,7 +5,6 @@
   "private": true,
   "scripts": {
     "gen": "meta gen",
-    "docs": "meta gen",
     "verify": "meta verify --templates --codegen --prompts templates",
     "test": "bun test",
     "build": "bun build src/cli.ts --target=node --outfile dist/smon.js"
