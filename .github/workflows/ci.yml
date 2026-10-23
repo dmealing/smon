@@ -5,8 +5,8 @@ name: CI
 #   1. `bun run gen` + assert no diff — regenerates src/generated/* and docs/generated/*
 #      from metaobjects/*.json and fails if the committed output doesn't match. It is the
 #      gate that proves the COMMITTED output is what the metadata currently produces.
-#   2. `bun run verify` — the metaobjects drift gates. The checks (--templates, --codegen, --prompts) run, and each answers
-#      a question step 1 does not:
+#   2. `bun run verify` — the metaobjects drift gates (--templates, --codegen, --prompts).
+#      Each answers a question step 1 does not:
 #        --templates  every template BODY still resolves against its payload. Since
 #                     MetaObjects 1.0 this covers `template.output @kind=email` bodies,
 #                     not only `@textRef` prompt nodes — a renamed AlertPayload field now
