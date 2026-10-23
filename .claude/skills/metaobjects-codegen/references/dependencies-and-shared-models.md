@@ -32,11 +32,13 @@ selection (every reference from a selected node must resolve to another selected
 node, or the build fails naming the pair) and re-loads the emitted artifact with
 core providers only, so a Phase 1a export needing non-core vocabulary fails at
 publish time. It is registered and shows up in `meta gen --list` like any other
-generator — but **it is deliberately not offered by `meta eject --list`** (unlike
-the four ADR-0034 scaffold-and-own generators). The artifact is a contract whose
-bytes a cross-port corpus pins and whose hash consumers verify; a user-owned,
-editable copy would invite an artifact that silently stops matching what
-consumers expect. Only TypeScript can run it in Phase 1a. **Phase 1a is TypeScript and Python
+generator, and `meta eject shared-model` copies a thin generator you own: which
+source files may contribute, and where the published version comes from. The
+artifact is a contract whose bytes a cross-port corpus pins and whose hash
+consumers verify, so everything a consumer checks stays in the package, in the two
+functions the copy calls (`buildSharedModel`, `renderSharedModelFiles`). Do not
+replace those calls: an unmodified copy publishes the same bytes as the packaged
+generator. Only TypeScript can run it in Phase 1a. **Phase 1a is TypeScript and Python
 only, full stop** — TypeScript and Python are the only two ports that can
 *consume* a dependency at all today, and only the TypeScript toolchain can
 *publish* one; Java, Kotlin, and C# do not read `dependencies` yet (Phase 2).

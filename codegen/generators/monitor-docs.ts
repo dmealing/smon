@@ -3,25 +3,15 @@
 // from the model, so the docs can never drift from what's actually declared.
 //
 // use-when:   ALWAYS for smon — companion doc to notify-registry.ts / probe-roster.ts.
-// emits:      docs/generated/monitoring.md — a project-root path OUTSIDE the
-//             default target's outDir (src/generated). Registering a second
-//             named `target` for this one file would work too, but the
-//             runner requires the entity-module target to declare an
-//             `importBase` as soon as ANY generator uses a different target
-//             (see runner.ts's needsCrossTarget check) — a real requirement
-//             for cross-target TS imports, but meaningless overhead for a
-//             plain-markdown generator that imports nothing. So this stays on
-//             the (only) default target and computes its EmittedFile.path as
-//             the relative hop from ctx.config.outDir back to the project
-//             root and down into docs/generated/ — robust to outDir changes,
-//             no fake importBase needed.
+// emits:      docs/generated/monitoring.md — written to the `docs` target (since 1.1.0
+//             documentation is a generator; targets.docs.outDir is ./docs), so the
+//             path below is relative to that target, not to src/generated.
 // customize:  column set/ordering per table is owned here.
 //
 // PUBLIC-REPO NOTE: only env-KEY NAMES from @requiredConfig / @optionalConfig
 // / @configKeys are rendered — never a resolved value. The model itself never
 // carries host data (see codegen/smon-provider.ts), so this can't leak any.
 
-import { relative } from "node:path";
 import type { MetaData } from "@metaobjectsdev/metadata";
 import { GENERATED_HEADER, GENERATED_EDIT_NOTE, type Generator } from "@metaobjectsdev/codegen-ts";
 
@@ -81,15 +71,14 @@ function renderProbesTable(probes: readonly MetaData[]): string {
   return ["| Probe | Script | Tags | Config keys |", "|---|---|---|---|", ...rows].join("\n");
 }
 
-// Project-root-relative — the runner joins ctx.config.outDir with the
-// EmittedFile.path we return, so we hop back out via a computed relative()
-// rather than hardcoding "../../monitoring.md" (keeps this correct even if
-// the default target's outDir gains/loses path segments).
-const DOCS_OUTPUT_PROJECT_RELATIVE_PATH = "docs/generated/monitoring.md";
+// Relative to the docs target (targets.docs.outDir in metaobjects.config.ts).
+const DOCS_OUTPUT_PATH = "generated/monitoring.md";
 
 export function monitorDocs(): Generator {
   return {
     name: "monitor-docs",
+    // Documentation target (1.1.0): written under targets.docs.outDir, beside the model pages.
+    target: "docs",
     generate: (ctx) => {
       const adapters = ctx.loadedRoot.childrenOfSubType(TYPE_ADAPTER, ADAPTER_SUBTYPE_NOTIFY);
       const probes = ctx.loadedRoot.childrenOfSubType(TYPE_PROBE, PROBE_SUBTYPE_BASH);
@@ -108,8 +97,7 @@ ${renderAdaptersTable(adapters)}
 
 ${renderProbesTable(probes)}
 `;
-      const path = relative(ctx.config.outDir, DOCS_OUTPUT_PROJECT_RELATIVE_PATH);
-      return [{ path, content }];
+      return [{ path: DOCS_OUTPUT_PATH, content }];
     },
   };
 }

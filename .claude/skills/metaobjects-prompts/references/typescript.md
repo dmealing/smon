@@ -22,19 +22,18 @@ provider/LLM-call layer — you compose the call yourself.
 ```ts
 // metaobjects.config.ts
 import { defineConfig } from "@metaobjectsdev/cli";
-// `meta init` scaffolds ./codegen/generators/ EMPTY (ADR-0034 Amendment 2). The entity
-// generators arrive by `meta eject entity queries barrel`, which copies each into that
-// directory as a file you own and prints the import to add — these three lines. They
-// have no package import: the old `@metaobjectsdev/codegen-ts/generators` re-export of
-// them was removed at 1.0. The parser's reply type is the @responseRef value object's
-// own interface, which `entity` emits, so `entity` has to be in the run.
-import { entityFile } from "./codegen/generators/entity.js";
-import { queriesFile } from "./codegen/generators/queries.js";
-import { barrel } from "./codegen/generators/barrel.js";
-// promptRender / outputParser can be imported from the package (below) OR owned:
-// `meta eject prompt-render output-parser` copies them into ./codegen/generators/ the
-// same way. Either way the render and parse ENGINES they call stay in the package.
-import { promptRender, outputParser } from "@metaobjectsdev/codegen-ts/generators";
+// `meta init` wires nothing (ADR-0034 Amendment 2). Each generator is imported from the
+// package to run it as shipped. The parser's reply type is the @responseRef value
+// object's own interface, which `entity` emits, so `entity` has to be in the run.
+// (On a 1.0.x install the first three have no package export: `meta eject entity queries
+// barrel` and import them from ./codegen/generators/ instead.)
+//
+// Any of these can be OWNED instead: `meta eject prompt-render output-parser` copies them
+// into ./codegen/generators/ and prints the local import to swap in. Either way the
+// render and parse ENGINES they call stay in the package.
+import {
+  entityFile, queriesFile, barrel, promptRender, outputParser,
+} from "@metaobjectsdev/codegen-ts/generators";
 
 export default defineConfig({
   outDir: "src/generated",
@@ -128,11 +127,10 @@ answer like this" fragment you splice into the prompt text so the model returns 
 shape the parser above expects:
 
 ```ts
-// metaobjects.config.ts — the same owned entity trio as above, plus outputPrompt
-import { entityFile } from "./codegen/generators/entity.js";
-import { queriesFile } from "./codegen/generators/queries.js";
-import { barrel } from "./codegen/generators/barrel.js";
-import { promptRender, outputParser, outputPrompt } from "@metaobjectsdev/codegen-ts/generators";
+// metaobjects.config.ts — the same entity trio as above, plus outputPrompt
+import {
+  entityFile, queriesFile, barrel, promptRender, outputParser, outputPrompt,
+} from "@metaobjectsdev/codegen-ts/generators";
 
 export default defineConfig({
   outDir: "src/generated",
@@ -223,12 +221,12 @@ it's usually already a dependency (Drizzle / `runtime-ts` lean on it), else
 
 ## See which fields a template consumes
 
-Run `meta docs` to emit the model surface to `./docs` — one page per
-`template.*` at `docs/<Template>.md`. Each template page has a
-`## Template source` section that shows the Mustache source with every `{{var}}`
-linked to that field's doc page (`docs/<Owner>.md#field-<name>`), plus a variables
+List `docsFile()` in `generators` and run `meta gen` to emit the model surface to the
+`docs` target — one page per `template.*` at `<outDir>/<Template>.md`. Each template page
+has a `## Template source` section that shows the Mustache source with every `{{var}}`
+linked to that field's doc page (`<outDir>/<Owner>.md#field-<name>`), plus a variables
 table — so you can see exactly which payload fields a template reads. Those links are
 build-time drift-gated against the render `verify()` engine, so a link can't claim a
-field that `verify()` would reject. (`meta docs` is the single door for all docs —
-it's a command, not a `meta gen` generator; the model surface here lands in `./docs`,
-the SDK/API surface under `./docs/api`.)
+field that `verify()` would reject. (`docsFile()` writes the model surface; `apiDocsFile()`
+writes the SDK/API surface, by default under `api/` of the same target — both are ordinary
+entries in `generators`, there is no separate docs command.)

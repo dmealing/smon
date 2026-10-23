@@ -6,6 +6,14 @@ binary `meta`). The full feature set ships here; other ports are measured agains
 
 ---
 
+## Contents
+- Finding generated files
+- Run codegen + verify
+- Drift signatures (what to grep for)
+- Owned generators — scaffold-and-own (ADR-0034)
+- Version-skew check
+- Calibration gaps (do NOT flag these)
+
 ## Finding generated files
 
 Generated files carry the header:
@@ -71,43 +79,96 @@ here — the table is its second pass, not its definition.
 `meta eject <name>...` copies the reference generator templates a project chooses into
 `codegen/generators/*.ts`. Since 1.0.4 `meta init` scaffolds that directory EMPTY with
 `generators: []` (a project initialised on an earlier CLI got four wired copies, so both
-shapes are normal). `metaobjects.config.ts` imports the **owned** local copies:
+shapes are normal). A generator reaches `metaobjects.config.ts` one of two ways, and both
+are supported from 1.1:
 
 ```ts
-import { entityFile } from "./codegen/generators/entity";
-import { queriesFile } from "./codegen/generators/queries";
+// run as shipped — nothing copied, fixes arrive by upgrading
+import { entityFile, queriesFile } from "@metaobjectsdev/codegen-ts/generators";
+// owned — a local copy the project can change
+import { routesFile } from "./codegen/generators/routes";
 ```
 
-**Removed import path.** `entityFile` / `queriesFile` / `routesFile` / `barrel` were
-exported from `@metaobjectsdev/codegen-ts/generators` and deprecated; **1.0 removed them**
-(ADR-0035 A3). On 1.0+ this no longer resolves:
-
-```ts
-import { entityFile, queriesFile, routesFile, barrel } from "@metaobjectsdev/codegen-ts/generators";
-```
-
-**Do NOT flag the subpath itself.** `@metaobjectsdev/codegen-ts/generators` is the supported,
-non-deprecated home of the generators it still exports — the prompt/output tier
-(`promptRender`, `outputParser`, `outputPrompt`, `extractor`, `renderHelper`),
-`traceHelperFile`, `routesFileHono`, `namesFile` and `callableFile`. The prompt tier can
-also be ejected (`meta eject prompt-render`), but owning it is optional; `traceHelperFile`
-and `callableFile` are package-only and this subpath is their only home. The CLI's own
-prompt-gate warning tells adopters to import `promptRender` from exactly this path. A
-project importing those from it is CORRECT, and reporting it as un-adopted scaffold-and-own
-is a false finding.
-
-**Finding this in a project:** grep for the four removed NAMES on that path, never the path
-alone:
+**Audit the owned copies first.** A copy exists to carry a change. One that carries none
+is duplication, and it falls behind the reference:
 
 ```bash
+meta eject --list --format text
+```
+
+Pass `--format text`. Away from a terminal the default is a structured document, and
+that document holds the generator rows only: it has no `codegen/runtime/` rows at all.
+
+The text listing marks each owned copy `identical to the reference`, `same content as the
+reference, your formatting`, or `DIFFERS: N line(s) behind, M line(s) of your own`. Those
+are the `--format text` labels. In `--format json` or `toon` the same row carries
+`status` (`identical`, `reformatted` or `differs`), `behind` and `own`.
+
+**Report a copy as a finding only when you can prove it unmodified.**
+
+- `identical to the reference` (`status: identical`) is the only mark that proves it. That
+  copy is a **finding**: recommend replacing its local import with the package import and
+  deleting the file, then `meta gen` and a review of the diff.
+- `same content as the reference, your formatting` (`reformatted`) and `DIFFERS` with
+  `0 line(s) of your own` (`differs`, `own: 0`) do not prove it. The comparison ignores
+  line order, and a line the adopter deleted counts as "behind" exactly like a line
+  upstream added, so `own: 0` rules out added or edited lines, not removed or reordered
+  ones. Confirm from the file's history
+  (`git log -p -- codegen/generators/<name>.ts` shows no edit after the eject) or from
+  `diff -u node_modules/@metaobjectsdev/codegen-ts/src/reference/<name>.ts codegen/generators/<name>.ts`
+  showing only upstream changes. Confirmed, it is the same finding. Not confirmed, report
+  it as **possibly customized: check its history**, never as a copy to drop.
+- A copy with lines of its own is an intentional customization. Check only how far behind
+  it is.
+
+**`entity`, `routes` and `routes-hono` own more than the generator file.** Ejecting one
+also copies the HTTP adapter its output imports into `codegen/runtime/`, and a route fix
+is often made there with the generator file left untouched. Read the state of those files
+from one of two places:
+
+- `meta eject --list --format text` prints a block of `codegen/runtime/` rows after the
+  generators, each marked `identical to the package`, `same content as the package, your
+  formatting`, `DIFFERS: N line(s) only in the package, M line(s) only in yours`, or
+  `not in the package`.
+- `meta gen --list --format json` puts them on the generator's own row, inside its
+  `source` object: an owned row has `owned: true` there and a `runtimeCopy` array, one
+  entry per adapter file that generator reaches, with `path` and `verdict` (`identical`,
+  `reformatted` or `differs`).
+
+**A listing with no runtime rows is not evidence that the adapter is unmodified.** If
+`codegen/runtime/` exists and the output you read shows no row for its files, you have
+not checked: run one of the two commands above.
+
+For these three, the copy is unmodified only when the generator file passes the test
+above AND every `codegen/runtime/` file it reaches is marked identical. If any of those files differs or
+is not in the package, the copy carries a customization: it is **not a finding**, and do
+not recommend the package import. The packaged generator imports
+`@metaobjectsdev/runtime-ts`, so swapping it in would leave the edited adapter unused with
+nothing reporting it. The owned generator is what points the output at that adapter (its
+`runtimeImport` option), so it stays.
+
+**Do NOT flag the subpath itself.** `@metaobjectsdev/codegen-ts/generators` is the supported
+home of every generator factory: the entity tier (`entityFile`, `queriesFile`, `routesFile`,
+`routesFileHono`, `namesFile`, `barrel`), the prompt/output tier (`promptRender`,
+`outputParser`, `outputPrompt`, `extractor`, `renderHelper`), `traceHelperFile`,
+`callableFile` and the rest. The CLI's own prompt-gate warning tells adopters to import
+`promptRender` from exactly this path. A project importing from it is CORRECT, and
+reporting it as un-adopted scaffold-and-own is a false finding.
+
+**The one version where an import is a blocker.** `entityFile` / `queriesFile` /
+`routesFile` / `barrel` were removed from that subpath at 1.0 (ADR-0035 A3) and restored in
+1.1 (ADR-0034 Amendment 5). On a 1.0.x install a config importing them fails to load with
+a message naming `meta eject`. Check the installed version before reading a hit as a
+finding, and match the four NAMES, never the path alone:
+
+```bash
+npm list @metaobjectsdev/codegen-ts
 grep -rn '@metaobjectsdev/codegen-ts/generators' . \
   | grep -E 'entityFile|queriesFile|routesFile|barrel'
 ```
 
-A hit is a 1.0 upgrade blocker (the import fails to resolve) — recommend `meta init` (or
-`meta eject <name>`) to scaffold the owned copies, then import those locally. The owned
-generator files themselves (`codegen/generators/*.ts`) are the second thing to audit: are
-they stale relative to the reference templates, or intentionally customized?
+On 1.0.x a hit is an upgrade blocker: recommend upgrading to 1.1, or `meta eject <name>`
+and importing the copies locally. On 1.1 and later a hit is correct.
 
 ---
 

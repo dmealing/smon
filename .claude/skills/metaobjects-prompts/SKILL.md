@@ -1,6 +1,6 @@
 ---
 name: metaobjects-prompts
-description: Use when writing, editing or reviewing ANY code that builds text sent to an LLM (string formatting, f-strings, text blocks, template literals, string builders, concatenation) or reads an LLM reply (regex, string search, JSON or XML parsing), even in a test harness or script. In a project that declares a template.prompt, that code belongs in a template, a payload VO and a response model. Also for declaring template.prompt/template.output, typed payload projections, provider-resolved text, deterministic render, prompt-drift verify and parser-on-receipt.
+description: Use when writing, editing or reviewing code that builds text sent to an LLM (string formatting, f-strings, text blocks, template literals, string builders, concatenation) or reads an LLM reply (regex, string search, JSON or XML parsing), in a project that declares template.prompt nodes; test harnesses and scripts count. That code belongs in a template, a payload VO and a response model. Also for declaring template.prompt/template.output, typed payload projections, provider-resolved text, deterministic render, prompt-drift verify and parser-on-receipt, including a MetaObjects project that has no template.prompt yet and wants to move existing LLM code onto them. Do not use to edit existing LLM code in a project that declares no template.prompt when the task is not declaring prompts.
 ---
 
 # MetaObjects prompt construction
@@ -12,7 +12,21 @@ snapshot-testable, cache-stable, and drift-checked at build time. The same
 machinery renders any text artifact: emails, exports, docs, `llms.txt`.
 
 This skill is port-agnostic. The exact render/parse API for *this* project's server
-language lives in a reference fragment (pointed to at the bottom).
+language lives in a reference fragment (see the table below).
+
+## Reference files — open the one for your server language
+
+Only the files for the server languages in this project's stack are installed. Read yours
+before you write or review any prompt code: it has the render and parse API, the generated
+parser and the output-format fragment for that language.
+
+| File | Open it when |
+|---|---|
+| `references/typescript.md` | the project's server language is TypeScript |
+| `references/java.md` | the project's server language is Java |
+| `references/kotlin.md` | the project's server language is Kotlin |
+| `references/csharp.md` | the project's server language is C# |
+| `references/python.md` | the project's server language is Python |
 
 ## Touching a hand-built prompt? Migrate it, don't extend it
 
@@ -307,9 +321,3 @@ names every required field — useful in a test of the renderer output itself,
 distinct from the `{{field}}`-vs-payload drift check `verify` runs on hand-authored
 template text. Check the language reference for whether this project's port ships
 the equivalent.
-
----
-
-For this project's server-language parser + output-format-fragment specifics, read
-every `references/*.md` file in this skill's directory (one per server language in
-this project's stack).

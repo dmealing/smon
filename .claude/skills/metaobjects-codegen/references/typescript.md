@@ -18,7 +18,7 @@ Topic files beside this one, to open when they come up:
 store MetaObjects does not manage, with a tested repository generator),
 `typescript-retargeting.md` (a framework other than Fastify, Hono or React),
 `typescript-templates.md` (declarative Mustache template-codegen) and `typescript-docs.md`
-(`meta docs`). The procedure for any unsupported stack is `any-stack.md`.
+(the docs generators). The procedure for any unsupported stack is `any-stack.md`.
 
 ## Write your own generator
 
@@ -36,6 +36,11 @@ generator exporting `<camelName>Generator()` — and adds its import and entry t
 `metaobjects.config.ts` (when the config has one literal `generators: [...]`; otherwise it
 prints the two lines to add). It refuses a reference generator's name (eject that one
 instead) and never overwrites your file without `--force`. Then edit the emit.
+
+In a repository that also has a C# port, `dotnet meta init` writes its codegen project into
+this same `codegen/` (`Generators.cs`, `Program.cs`, `Codegen.csproj`, and C# ejects in
+`codegen/generators/`). The two coexist: `tsconfig.codegen.json` includes only
+`codegen/**/*.ts`, and the C# project compiles only `*.cs`.
 
 Everything a generator reads comes from `@metaobjectsdev/codegen-ts`: `perEntity` /
 `perPackage` / `perModel`, `isAbstract`, `hasAnyRdbSource`, `isProjection`,
@@ -64,25 +69,23 @@ Codegen is wired in a type-checked TS config at the project root. `defineConfig`
 comes from `@metaobjectsdev/cli`; the generators come from their packages.
 
 `meta init` scaffolds this file with **`generators: []`** — nothing is generated until
-you choose it. Each import below appears once you `meta eject` that generator, which
-prints the exact line to add.
+you choose it. Each import below runs a generator as shipped; `meta gen --list` prints
+the exact line for every generator. Only a generator you are going to change is ejected:
+`meta eject <name>` copies it into `codegen/generators/` and prints the local import to
+swap in for the package one.
 
 ```ts
 import { defineConfig } from "@metaobjectsdev/cli";
-// Owned generators — copied in by `meta eject` (ADR-0034 scaffold-and-own).
-import { entityFile } from "./codegen/generators/entity";
-import { queriesFile } from "./codegen/generators/queries";
-import { routesFile } from "./codegen/generators/routes";
-import { barrel } from "./codegen/generators/barrel";
+// Run as shipped: nothing copied, fixes arrive by upgrading the package.
+import { entityFile, queriesFile, routesFile, barrel } from "@metaobjectsdev/codegen-ts/generators";
 import { formFile } from "@metaobjectsdev/codegen-ts-react";
 import { tanstackQuery, tanstackGrid } from "@metaobjectsdev/codegen-ts-tanstack";
 
 export default defineConfig({
   outDir: "src/generated",
   dialect: "postgres",                 // "postgres" | "sqlite" | "d1" | "mysql" (mysql: codegen + runtime; migrate does not own it)
-  extStyle: "js",                      // "js" (default) for Node ESM / plain tsc; "none" for a bundler-resolution toolchain — see SKILL.md "Your framework isn't the default"
+  extStyle: "js",                      // "js" (default) for Node ESM / plain tsc; "none" for a bundler-resolution toolchain — see `owning-generators.md` "Your framework isn't the default"
   apiPrefix: "/api",                   // flows to routes AND client fetch URLs
-  columnNamingStrategy: "snake_case",  // "snake_case" (default) | "literal" | "kebab-case"
   timestampMode: "string",             // "string" (default, ISO-8601 wire contract) | "date" (Drizzle native Date)
   pluralizeCollections: true,          // default; table VARS auto-pluralize (AgentConfig → agentConfigs)
   collectionNameOverrides: {           // per-entity escape hatch for names the rule gets wrong
@@ -113,22 +116,62 @@ a bare string**, and it names a DIRECTORY or a file:
 { "schema_version": 1, "sources": [{ "path": "model" }, { "path": "../shared/metadata" }] }
 ```
 
-Every command's directory argument (`meta docs <project-root>`, `--cwd`) is the
+Every command's directory argument (`meta gen <project-root>`, `--cwd`) is the
 PROJECT ROOT that CONTAINS the metadata — never the metadata directory itself.
 
 ## The generators
 
 Server-side, framework-neutral. **None is wired by default** — `meta init` writes
-`generators: []` and an empty `codegen/generators/`. `meta eject <name>...` copies the
-ownable ones into your repo, imported from `./codegen/generators/*` (ADR-0034); 1.0
-REMOVED their `@metaobjectsdev/codegen-ts/generators` export, so an owned copy is the only
-path for those. The engine primitives come from the package main entry,
-`@metaobjectsdev/codegen-ts`. The `/generators` subpath itself is NOT deprecated. It
-exports the prompt tier (`promptRender`, `outputParser`, `outputPrompt`, `extractor`,
-`renderHelper`) and `namesFile`, which you may import from there OR eject to own, and it is
-the only home of the package-only generators — `traceHelperFile`, `callableFile`,
-`requirementTests` — which ship no reference template (`meta gen --list` marks them
-`package-only`).
+`generators: []` and an empty `codegen/generators/`. Every generator below is imported from
+`@metaobjectsdev/codegen-ts/generators` to run it as shipped; `meta gen --list` prints
+each import line. To change what one emits, `meta eject <name>...` copies it into your
+repo, imported from `./codegen/generators/*` instead (ADR-0034); the factory keeps its
+name. Import by default and eject to customize: an owned copy you never change only falls
+behind the reference. (`entityFile` / `queriesFile` / `routesFile` / `barrel` were removed
+from that subpath at 1.0 and restored in 1.1, so on a 1.0.x install an owned copy is the
+only path for those four.) Two entries cannot be ejected and are `package-only` in
+`meta gen --list`: the `template` primitive, which has no emit logic of its own, and
+`docs-site`, whose builder stays in the package (`meta eject docs-site` copies the site's
+templates and assets into `codegen/docs-site/`). An ejected generator comes with the
+template modules that write its output (`codegen/templates/`); the engine stays in the
+package, and an owned copy imports it from `@metaobjectsdev/codegen-ts/engine`.
+
+Some ejectable entries behave differently from the rest:
+
+- **`docs`, `api-docs`, `requirements` and `agent-docs` are run by `meta gen`, like any
+  other entry.** There is no separate docs command (removed in 1.1.0, ADR-0034 Amendment
+  9): list `docsFile()`, `apiDocsFile()`, `requirementsFile()` and `agentDocsFile()` in
+  `generators` the same way you list `entityFile()`. Each defaults to a target named
+  `docs` (`targets.docs.outDir`) unless given its own `target`, and a run that lists one
+  while `targets` has no `docs` entry is refused, naming the generator. To change the
+  pages, `meta eject docs` (or `api-docs`, `requirements`, `agent-docs`) and list the copy
+  in `generators` in place of the packaged factory — there is no separate `docs` block to
+  put it in. To change only a page's wording, put your own
+  `templates/docs/entity-page.md.mustache` in the project instead. Full reference:
+  `typescript-docs.md`.
+- **The ER diagram comes from `docsFile()`** (overview page, and each entity's page). The
+  standalone `mermaidErDiagram()` / `"mermaid-er"` generator was removed in 1.1; a config
+  that still wires it fails with a message saying so. Remove it and run `meta gen`.
+- **`shared-model` ejects with its artifact builder.** The copy decides which source files
+  may contribute and where the published version comes from. The artifact, its hash and the
+  manifest a consumer's `meta deps sync` verifies are written by `buildSharedModel` and
+  `renderSharedModelFiles`, copied beside it: change what they do and you stop agreeing with
+  every consumer.
+
+In an owned generator, read the project's own files through `ctx.inputRoot`. Under
+`meta verify --codegen` the run writes into a temporary tree and `ctx.projectRoot` is that
+tree; under a plain `meta gen` it is the directory that holds `metaobjects.config.ts`.
+
+**`requirementTests()` — one test stub per requirement the model claims.** A recommended
+approach, not a contract: a `live` or `partial` requirement gets a stub that fails until
+you write its assertion (the three-way merge keeps it), a `planned` or `retired` one a
+skipped stub. Options: `filter` (a predicate over `subType`, `level`, `status`, `path`,
+`package`, `implementedByTypes` that REPLACES the default of functional L4/L5), `grain`
+(`"concern"`, the default, or `"member"`; anything else is refused), `warnUncovered`,
+`renderers` / `resolveRenderer`. `meta eject requirement-tests` copies the generator and
+its default stub renderer into `codegen/generators/requirement-tests.ts`; the requirement
+walk, each test's identity and the claim digest are engine and stay in the package. The requirement
+checks in `meta verify` are core and are not ejectable.
 
 The table below is a per-emission reference, NOT the selection surface. Select with
 `meta gen --list --format json --probe`, which is generated from the live registry and
@@ -153,10 +196,50 @@ Its REST surface is generated and READ-ONLY (F22): GET list + GET by id, the sam
 `?filter[...]`/`?sort=` grammar as a table entity against allowlists built from the
 projection's OWN declared field set, and `POST` / `PATCH` / `PUT` / `DELETE` each
 answering `405 {"error": "method_not_allowed"}` — 405 and not 404 because the same
-path answers GET. A KEYLESS projection (no `identity.primary`) mounts no `/{id}` route
-at all, so it refuses only the collection verb.
+path answers GET. A KEYLESS projection mounts no `/:id` route at all, so it refuses only
+the collection verb, and it gets no `find…ById` query and no detail hook. Keyless means no
+declared `identity.primary`: a field that is merely named `id` is a convention, not a key, so
+a projection with an `id` field and no declared identity is keyless too (in every port).
 `routesFile()` mounts it through `mountReadOnlyCrudRoutes` from the drizzle-fastify
 adapter (your `codegen/runtime/` copy once ejected), which is where the refusals live.
+A `field.decimal` in a view's read schema is `z.string()`: the driver reads `numeric` as
+a string.
+
+**Reports.** A concrete `object.report` whose read source is `source.rdb @kind: view` is
+served like a keyless projection, from a detached read model of its derived fields
+(dimensions, then measures). For a report `<R>` the generators write `<R>.ts` (Drizzle
+view binding, Zod read schema, row type, descriptor, filter and sort allowlists),
+`<R>.queries.ts` (`list…` only, no by-id), `<R>.routes.ts` (and `<R>.routes.hono.ts` from
+`routesFileHono()`): GET list, `POST` answers 405, no `/:id`; `<R>.names.ts`; and the barrel
+export. Every derived field with filter operators is filterable and sortable. The UI tier
+writes the list hook and nothing else: `<R>.hooks.ts` (`use<R>List`, typed with the report's
+filter, no detail or mutation hook) and its `<R>.meta.ts` descriptor, and `agent/ui.md` lists
+the report. The hook generator gates on `servesClientHooks`, which is true for a served
+report; the grid generators gate on `servesClientTier`, which is false, so there is no grid,
+grid hook or form. An ejected hook generator keeps the gate it was copied with and writes no
+report hook until you resync it (`meta eject`). On SQLite a decimal field of a report (an
+`avg`, a ratio) is sent as a string, as on Postgres: the route passes `decimalColumns` to the
+mount. A report with no view source, or an abstract one, generates nothing. The route and
+contract: `references/reporting.md` in the `metaobjects-authoring` skill.
+
+**Cube export (`cubeModel()`).** A reference helper that writes the reporting vocabulary
+(`dimension.*`, `measure.*`, `segment.filter`, a served `object.report`) as Cube data-model files,
+`model/cubes/<Cube>.yml`: a cube for each table-backed entity that declares any of it, a join for
+each to-one reference between cubes, and a `rollup` pre-aggregation on the `@from` cube for each
+served report (a report with a relative date in its `@filter`, `@segment` or a listed measure's
+condition gets no rollup, and a `<report>Scope` segment only when it has a `@filter`). It
+is opt-in: `meta eject cube-model` copies it, or import `cubeModel` from
+`@metaobjectsdev/codegen-ts` (also from `/generators`), and point it at the Cube project with a
+target (`targets: { cube: { outDir: "cube" } }`, `cubeModel({ target: "cube" })`). Options:
+`dialect` (`"postgres"` or `"mysql"`, default the config's; `sqlite` and `d1` raise
+`ERR_CUBE_UNSUPPORTED_DIALECT`), `filter` and `target`. What Cube cannot take is an `ERR_CUBE_*`
+error naming the node (an array or object dimension, a name that is a Python keyword, two members
+of one name); the exporter never renames or drops. A measure's `@default` is a `COALESCE` over it
+(a `measure.aggregate` keeps its aggregate as a `public: false` `<m>Raw` member), and a served
+report with `@spine` is a Cube view, `model/views/<Report>.yml`, rooted at the spine cube over a
+`public: false` `<Report>Facts` cube that holds the report's scope, with no rollup. The mapping,
+wiring and the `cube` lane that checks it against a real Cube are in
+`docs/features/cube-export.md`.
 
 The `CREATE VIEW` DDL is generated by `meta migrate`
 from the projection's `origin.*` children — `origin.passthrough` (a forwarded column),

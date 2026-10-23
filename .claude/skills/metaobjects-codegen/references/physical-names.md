@@ -9,6 +9,13 @@ free-form, so a field named `callPurpose` may map to a column named `purpose_cod
 neither the field name nor any transformation of it. A consumer deriving the column as
 `to_snake_case(<the field's name>)` gets that case wrong and never finds out.
 
+## Contents
+- Reference the generated names artifact
+- Check that it is actually wired before you reference it
+- It follows `extends`
+- Where generated code consumes it, and where it does not
+- But prefer a typed handle where one exists — this rule has a real limit
+
 Every port emits a per-object names artifact. Reference it:
 
 ```ts
@@ -47,8 +54,8 @@ emitting this artifact. "Wired" is the only fact there is.
 
 | Port | Where the selection is declared | An existing project upgrading gets it? |
 |---|---|---|
-| C# | `--generators <names>` on `dotnet meta gen` — required, no default | **No** — name `names` |
-| Python | `--generators <names>` on `metaobjects gen` — required, no default | **No** — name `names` |
+| C# | `codegen/Generators.cs` — the complete list, documentation included | **No** — add the `names` entry |
+| Python | a target's `generators` in `metaobjects.config.yaml` — the complete list | **No** — add `names` |
 | TypeScript | `metaobjects.config.ts` `generators: [...]` — the complete list | **No** — add `namesFile()` |
 | Java / Kotlin | the pom's `<generators>` — the complete list | **No** — add `SpringNamesGenerator` / `KotlinNamesGenerator` |
 

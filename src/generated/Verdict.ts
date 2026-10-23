@@ -15,3 +15,31 @@ export const VerdictInsertSchema = z.object({
   tag: z.string().min(1),
   prose: z.string().min(1),
 });
+/**
+ * Metadata constants for the value object Verdict: each field's name, label, view and the
+ * validation rules derived from its validator children (e.g. `Verdict.<field>.rules.maxLength.value`).
+ */
+export const Verdict = {
+  $entity: "Verdict",
+  status: {
+    name: "status",
+    label: "Status",
+    view: "dropdown",
+    rules: { required: "Status is required" },
+    options: ["OK", "WARN", "FAIL"] as const,
+  },
+  tag: {
+    name: "tag",
+    label: "Tag",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Tag is required" },
+  },
+  prose: {
+    name: "prose",
+    label: "Prose",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Prose is required" },
+  },
+} as const;

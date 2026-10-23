@@ -37,8 +37,8 @@ export default defineConfig({
 - Abstract objects are excluded from every scope.
 
 **Reusing a C#/Python spec.** Those ports declare the same generators as a JSON
-template-spec because their registries are closed and the flag is their only seam. Parse
-it and spread it:
+template-spec, because their generator lists are code (C#) or YAML (Python) rather than a
+TypeScript config. Parse it and spread it:
 
 ```ts
 import { parseTemplateSpec, templateSpecToGenerators } from "@metaobjectsdev/codegen-ts";

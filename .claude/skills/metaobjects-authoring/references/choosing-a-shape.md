@@ -2,6 +2,11 @@
 
 > Part of the `metaobjects-authoring` skill. Read it when no row of the skill's "Canonical form for common field needs" table fits, when you need the full rule behind a row (UUID, timestamps, URIs/IPs, `@autoSet`, validated strings), or when you are registering vocabulary of your own.
 
+## Contents
+- The decision procedure (ADR-0037)
+- Subtype rules in detail
+- Extending the metamodel — custom providers, and the downstream lifecycle
+
 ## The decision procedure (ADR-0037)
 
 This procedure decides the shape of **any** concept entering the metamodel — a

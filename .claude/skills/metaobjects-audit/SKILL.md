@@ -8,27 +8,73 @@ description: Use when assessing how well a project has adopted MetaObjects — g
 **Thesis.** Typed metadata is the durable spine; generated code is the disposable
 artifact. Hand-writing a layer the metadata could own creates a second source of
 truth for one fact — it will drift. This audit hunts those second sources of truth
-and proposes folding them into the spine.
+and proposes folding them into the spine — where the generator code plus its generated output
+and added metadata is fewer lines than the hand-written code it replaces, more of that shape
+are coming, or silent drift is the risk. A one-off layer
+that fails that cost test is acceptable, not a defect.
 
 **Boundary — read-only.** Deliverables: `.metaobjects/adoption-audit.json` (machine-readable
 findings) + a rendered Markdown report. The audit **never edits code, never authors
 metadata** — `metadata_sketch` per finding is a read-only proposal for human review.
 Actual cutovers run through the existing skills mapped per finding tier (§ Bridge).
 
----
+## Reference files — open the one your task needs
+
+| File | Open it when |
+|---|---|
+| `references/calibration.md` | Before raising any finding: it lists the port gaps and non-defects that are never the adopter's fault. |
+| `references/surface-review-axes.md` | Working any axis (A–I) of Phase 1b. |
+| `references/capability-checklist.md` | On every axis: the exhaustive list of what the metamodel can express, one hunt per capability. |
+| `references/drift-signatures.md` | Hunting hand-written second sources of truth (validators, mappers, comments, views, JSON bags). |
+| `references/prompt-anti-patterns.md` | Axis D: the project builds text sent to an LLM or parses a reply. |
+| `references/vocabulary-hygiene.md` | Axis I: retired or deprecated authoring forms, custom vocabulary, vocabulary opportunities. |
+| `references/requirements.md` | Axis E2: the project declares `requirement.*` nodes. |
+| `references/typescript.md`, `java.md`, `kotlin.md`, `csharp.md`, `python.md` | The server port the project uses (only the ports in the project's stack are installed). |
+
+## Guardrails
+
+- **Adoption direction — metadata follows the code.** This is a brownfield project: existing
+  code and the live schema are the spec. Every `metadata_sketch` must **reproduce the code's
+  existing native types, names, and nullability** (model `field.uuid` where the code uses
+  `UUID`, carry over `@column`/`@table`/`@required`) and every cutover must **minimize churn to
+  code the generator is not replacing** — customize the codegen to match the existing shape
+  before proposing edits to working call sites. A sketch that would re-type or rename working
+  code the generator isn't replacing is modeling the wrong thing; when a choice is ambiguous,
+  flag it for the human rather than proposing the churnier option. (Full doctrine:
+  `metaobjects-authoring` → "Adopting onto an existing codebase".)
+- **Parity-gate every cutover** — prove behavior-equivalent before deleting hand-written code; generated schemas are often looser.
+- **Verify, don't assume** — read the code behind a grep hit.
+- **Calibrate before flagging** — `references/calibration.md` lists what is never the adopter's fault.
+- **Verify the DB artifact, not just the types** — the contract may claim a column the view DDL dropped.
+- **Don't let one bespoke action block generating the entity** — generate CRUD; mount the custom action alongside.
+- **Consumption ≠ a dist copy across versions** — bump + rebuild lockstep and install.
 
 ## Phase 0 — Triage (fast, mechanical)
 
 - [ ] MetaObjects present? (`metaobjects/` dir, metadata sources, `@metaobjectsdev/*` /
   `com.metaobjects:*` / `metaobjects` / `MetaObjects.*` deps).
 - [ ] Count metadata source lines + all `@generated` / `DO NOT EDIT` files repo-wide.
-- [ ] **Owned-generators check:** does the project own generators at `codegen/generators/*`
-  (scaffold-and-own via `meta eject`, or `meta init` on a CLI before 1.0.4), or still import `entityFile` / `queriesFile` /
-  `routesFile` / `barrel` from `@metaobjectsdev/codegen-ts/generators`? Those four were
-  REMOVED at 1.0, so an import of them is an upgrade blocker, not just a style finding.
-  **Match the four NAMES, never the subpath alone** — that subpath is the supported home of
-  the non-ownable generators (`promptRender`, `outputParser`, `routesFileHono`, …), so
-  flagging a hit on the path convicts a correct project.
+- [ ] **Owned-generators check:** which generators does the project own at
+  `codegen/generators/*` (via `meta eject`, or `meta init` on a CLI before 1.0.4), and
+  which does it import from `@metaobjectsdev/codegen-ts/generators`? Both are supported
+  from 1.1. Two findings to look for. **An unmodified owned copy** is duplication that
+  falls behind the reference: `meta eject --list --format text` marks each copy, and one
+  marked `identical to the reference` should be replaced by the package import. That is
+  the only mark that proves a copy unmodified. `same content as the reference, your
+  formatting` and `DIFFERS` with `0 line(s) of your own` rule out added or edited lines,
+  not removed or reordered ones: confirm those from the file's history
+  (`git log -p -- codegen/generators/<name>.ts` shows no edit after the eject) first, and
+  report a copy you cannot confirm as "possibly customized: check its history", not as a
+  copy to drop. For `entity`,
+  `routes` and `routes-hono` that holds only when every `codegen/runtime/` file the copy
+  reaches is also marked identical: an edited adapter is a customization, and such a copy
+  is not a finding. Those runtime rows appear only with `--format text` (or as the
+  `runtimeCopy` array inside the row's `source` object in `meta gen --list --format
+  json`); a listing with no runtime rows is not evidence that the adapter is unmodified. **An import of `entityFile` /
+  `queriesFile` / `routesFile` / `barrel` on a 1.0.x install** fails to load, because 1.0
+  removed those four and 1.1 restored them: there it is an upgrade blocker, fixed by
+  upgrading to 1.1 or by ejecting. Importing anything from that subpath is otherwise
+  correct and is never a finding by itself.
 - [ ] **Cross-language version consistency (silent-drift check).** If the project uses MetaObjects in more than one language (e.g. a TS web client + a Java/Python/C# backend), enumerate EVERY MetaObjects package across ALL ecosystems (npm `@metaobjectsdev/*`, Maven `com.metaobjects:*`, PyPI `metaobjects`, NuGet `MetaObjects.*`) and record each version. **The version-number LINES differ by ecosystem (npm/PyPI/NuGet `0.x`/`1.x` vs Maven `7.x`/`8.x`), so you CANNOT eyeball drift** — a `0.12` next to a `7.7` looks fine but can be badly out of sync. Compare the **`metamodelVersion`** each port reports (the shared spec version on the registry manifest): a mismatch is real cross-language drift and a **finding** — the ports disagree on vocabulary/wire behavior. Also flag any port not on the latest release for its ecosystem. (This is a known real-world failure mode: newest backend, stale client, invisible because the numbers differ.)
 - [ ] Classify: **Greenfield** (none/minimal) · **Partial** · **Deep** → choose path below.
 
@@ -47,7 +93,11 @@ Actual cutovers run through the existing skills mapped per finding tier (§ Brid
 
 **Census:** generated output line/file counts + metadata/owned-generator lines.
 Compute **leverage ratio** = `generated_lines / (metadata_lines + generator_lines)`;
-healthy = multi-× (example: ~4.7k spine → ~15.7k generated ≈ 3.3×).
+healthy = multi-× (example: ~4.7k spine → ~15.7k generated ≈ 3.3×). **Never report a
+generated-share or leverage figure alone, and never as a target:** pair it with the **net
+hand-written line change**, a figure to report and not the cost test (hand-written lines
+removed minus generator and metadata lines added). A share can rise while total hand-written
+code grows.
 
 **Coverage matrix:** per entity/projection/value — query helpers? view? routes? UI?
 The gap between "modeled + query helpers" and "has view + route + UI" is the headline
@@ -55,253 +105,20 @@ lopsidedness.
 
 **Surface review — 8 axes (independently runnable).**
 Work the full `references/capability-checklist.md` on every axis. Check calibration
-guards (§ Calibration) before raising a finding. **Verify, don't assume** — read the
+guards (`references/calibration.md`) before raising a finding. **Verify, don't assume** — read the
 code behind a grep hit; a "duplicate" validator's *divergence* is the finding.
 
-- [ ] **A. Codegen candidates — API / server routes.** Catalog + classify every handler.
-- [ ] **B. Codegen candidates — web / client.** Pages, data layer (hooks, central fetch),
-  grids/forms/filters vs `layout.dataGrid` / form generators / filter-allowlist.
-- [ ] **C. Drift hotspot — validators, mappers, runtime models.** Hand validators / DTO-mappers /
-  dataclasses shadowing a generated shape. Diff field-by-field; the divergence is the bug.
-- [ ] **D. Prompt pillar.** Every LLM prompt-construction site (see § Prompt anti-patterns).
-- [ ] **E. Owned generators & scaffold-and-own** (see § Owned-codegen assessment).
-- [ ] **E2. Capability ledger — `requirement.*`** (see `references/requirements.md` and the
-  Requirement axis of the capability checklist). The one axis whose hunt is hand-written
-  PROSE rather than hand-written code: a `CAPABILITIES.md`, a README features table, a
-  conventions doc, a known-and-tolerated gap recorded as a TODO, or a rule that exists only
-  as a comment above the field it governs. Prose goes stale in silence; `@implementedBy` is
-  a reference the loader resolves, so a rename that invalidates the claim is caught.
-  **Entirely opt-in — an absent ledger is NOT a defect** (object coverage is a warning by
-  design, and a real estate reports most of itself unclaimed on day one). Score the prose
-  it would replace, and prefer ONE concrete claim an author can check over a
-  whole-estate migration.
-  **First establish the estate LOADS.** An older ledger fails the load outright, so
-  `meta verify` never runs and everything in `references/requirements.md` is unavailable:
-  `@violation` and `@verifiedBy` were retired in **0.24.0** (no deprecation shim — ADR-0023
-  seals the registry); an index key declaring both `@fields` and `@expr` is refused since
-  **0.24.1**; and **0.24.2** turned `@status: abandoned | superseded` into **`retired`**. Run
-  **`meta upgrade`** (previews by default; `--apply` writes) before auditing, and audit the
-  upgraded tree. It rewrites only what has one correct answer and **refuses the rest, exiting
-  non-zero** — a refusal is itself a finding, naming the entries whose disposition nobody
-  recorded.
-  **Then audit the `retired` entries specifically.** They are where the ledger earns its
-  keep — agents proposing a retired capability's rebuild is the one failure this mechanism
-  has controlled evidence against — and they are also where it decays quietly. Check that
-  each `@statement` reads as a PROHIBITION rather than a diary entry ("X is never done",
-  not "we used to do X"), and that `@counterexample` describes the REVIVAL. A retired entry
-  whose statement narrates history is invisible to the reader it exists to stop.
-- [ ] **F. Drift-gate adoption.** Is `meta verify` wired into CI / pre-commit? Which
-  subverbs (`--codegen` / `--templates` / `--db`)? Committed-codegen freshness gate?
-  Advisories heeded? Routine `--no-verify` bypass? Loader `ERR_*` / warnings addressed?
-  Parse the stable `code` field, not message text (ADR-0009).
-  **Is any advisory half switched OFF?** A gate can be wired, green, and muted. The
-  requirements authoring lint is advisory and mutable — `--no-requirement-lint` or
-  `META_NO_REQUIREMENT_LINT=1` silences it while the gate above it still runs and can still
-  exit 1, so a green pipeline says nothing about the seven `WARN_REQUIREMENT_*` authoring
-  checks. Grep CI config and scripts for both spellings. Muted is not automatically a defect —
-  a project that made a deliberate call is fine — but it moves those checks back onto the
-  auditor (see `references/requirements.md`), so **say which it is** rather than reporting the
-  ledger as lint-clean.
-  **Coverage completeness — "wired" is not "covers it all."** A gate can be present
-  yet blind to a whole artifact class. Confirm each subverb actually covers what the
-  project HAS: (a) **templates** — `verify --templates` on a CLI before the #193 fix
-  SKIPS `template.output @kind=email` and does not body-check a document
-  `template.output`'s mustache, so a `{{field}}` that drifted from the payload sails
-  through; a project with email/output templates that relies on `verify` alone (no
-  `meta gen` + `git diff --exit-code`, and no CLI past the fix) can ship broken —
-  **finding**; (b) **codegen** — committed generated code needs `--codegen` (or
-  gen+no-diff), else hand-edits/regeneration drift silently; (c) **schema** — `--db`
-  (Node `meta` only) for DB drift. Flag a gate that is WIRED BUT INCOMPLETE for the
-  artifacts present, and recommend the specific missing coverage.
-- [ ] **F2. Over-generation — unnecessary generated files (codegen WASTE).**
-  Generated code is disposable, but that is NOT license to generate what nothing
-  consumes. Every generated file is a merge/review/maintenance surface and inflates
-  the leverage ratio falsely. Hunt OVER-generation (the inverse of A/B's
-  under-generation):
-  - **Dead generated files** — an `@generated` file that NOTHING imports or
-    references repo-wide (grep the emitted symbol / module path for importers):
-    delete it and stop generating it.
-  - **Artifacts an entity doesn't need** — REST routes / TanStack grids / forms /
-    hooks emitted for an entity that has no such surface. The remedy is the
-    generator's own `filter` option (`routesFile({ filter: (e) => e.name !== "Audit" })`,
-    `tanstackQuery({ filter })`), which is ANDed with the generator's built-in gates
-    and so can only NARROW what emits; a grid additionally needs a `layout.dataGrid`
-    on the entity at all. Flag the unused artifact and name the filter that would
-    suppress it. **Never recommend an `@emit*` attribute** — `@emitRoutes`,
-    `@emitTanstack`, `@emitForm`, `@emitGrid` and `@emitAngular` were never
-    registered vocabulary, so they passed `meta gen` (open load) and FAILED
-    `meta verify` (strict). A project carrying one is a **finding**, not an opt-out:
-    report it and route to `meta upgrade --apply` plus the generator config above.
-  - **Generators wired but unconsumed** — a generator in `metaobjects.config.ts`
-    `generators: [...]` (or the per-port equivalent) whose whole output class no
-    code imports: drop the generator rather than generate into the void.
-  - **Wrong target / duplicate output** — the same logical artifact emitted to two
-    places (a mis-set per-target `outDir`), one of which is orphaned.
-  Recommend generating ONLY what is consumed — decide per generator: drop the ones
-  whose whole output class nothing imports, and narrow the ones that over-emit with
-  their `filter`. A smaller, fully-consumed generated surface beats a large one with
-  dead files (which also make the leverage ratio lie; discount them from the census).
-- [ ] **G. Runtime-contract anti-patterns.** Module-global `db` vs context-as-parameter
-  (ADR-0008); wire-canonicalization in the query path vs native in-process return types
-  (ADR-0019); runtime reflection to resolve a type from FQN vs generated static imports /
-  FQN registry (ADR-0001 / 0017); process-global registry vs per-loader (ADR-0014); code
-  that **mutates the loaded metadata tree** (read-only after load); JVM/Kotlin missing
-  startup validator; writes not routed to the `@role: primary` source; **`own*()`
-  accessor reads of effective properties / own-only member iteration (ADR-0039 — see
-  the active check below).**
+Axes (the full hunt for each is in `references/surface-review-axes.md` — open it before working an axis):
 
-- [ ] **G2. `own*()` accessor discipline (ADR-0039 — CORRECTNESS DEFECT, not advisory).**
-  In any custom generator, metamodel provider, or runtime path (NOT the sanctioned cases
-  below), **flag every read of a field/node's effective property, or own-only member
-  iteration, done through an own-only accessor** — it silently drops everything inherited
-  via `extends` (a super-reference, not a flatten), corrupting codegen and runtime. This
-  is exactly the class of bug that broke Kotlin's array-type derivation (a concrete field
-  inheriting an array flag from an abstract parent generated a scalar) and, per the audit,
-  is latent cross-port. Grep for the own-only accessors and verify each hit:
-  - **TS:** `ownAttr(`, `ownChildren(`, `ownFields(`, a raw `isArray` field flag read →
-    should be `attr(` / `children()` / `fields()` unless emitting a subclass's own members.
-  - **Python:** `own_children(`, `own_fields(`, and the **inverted** bare `attr(` (Python
-    `attr()` is OWN; the resolving form is `attrs().get(`) → flag `attr(` used to read an
-    effective value.
-  - **Java / Kotlin:** `getMetaAttr(name, false)` (the `,false` own overload), own-only
-    child walks (e.g. an own-only `filterIsInstance<…>()` source lookup that emits nothing
-    for an entity inheriting its source).
-  - **C#:** a native `IsArray` flag read, `OwnChildren()`, own attr reads.
-
-  **Sanctioned (do NOT flag):** (a) a generator emitting a generated **subclass** that
-  iterates `ownFields()` so inherited members aren't re-emitted (the generated base
-  declares them — the `class Sub extends Base` / TPH pattern); (b) the own-mode canonical
-  serializer + overlay-merge + super-resolution walks (library-internal); (c) the single
-  deliberately-own attribute `@dbColumnType` (a physical column-type override, never
-  inherited). Any own read that carries a comment naming one of these cases is fine; an
-  uncommented own read of an effective property is the defect.
-- [ ] **H. Authoring-correctness / ADR-conformance (deep).** Invented/unregistered
-  `@`-attrs or post-bootstrap registration (ADR-0023 — custom attrs belong in a registered
-  provider or `attr.properties`); retired source-v2 forms (`source.dbTable` / `@name` /
-  `@dbColumn` → use `source.rdb` + `@kind` + `@table` / `@column` + `@role`, ADR-0007/0018);
-  taxonomy impurity (entity over read-only primary source; read model that should be
-  `object.projection`; `value` carrying identity/source, ADR-0028); copy-pasted base-field
-  blocks — or the same-named field re-declared across objects (drift signature 10) — instead of
-  abstract + `extends`; `@`-prefixed YAML keys (ADR-0006); relative refs
-  in committed canonical JSON (ADR-0032); DB-type-as-logical-subtype (ADR-0013); per-port
-  migration engine where schema is Node-`meta`-owned (ADR-0015).
-
-- [ ] **H2. Wrong native type — `field.<x>` + `@dbColumnType` that hides the real type
-  (CORRECTNESS-ADJACENT finding, NOT advisory axis-I).** The headline instance is a **UUID
-  column modeled `field.string` + `@dbColumnType: uuid`**: the DB column is uuid but the
-  generated property is a **`String`**, so the code coerces `String↔UUID` at every boundary
-  and the native type is wrong everywhere the field is used. `verify --db` **cannot** catch it
-  (the column type matches), so it hides in plain sight. When it sits in a shared
-  `BaseEntity`/`BaseAuditedEntity`, **every inheriting `id`/`tenantId`/FK is wrong** — count the
-  blast radius (grep every `field.string` paired with `@dbColumnType: uuid`; it is often
-  hundreds of fields). This is a **real finding**, not a modernization nudge: recommend
-  `field.uuid` and flag it as a **staged migration** (re-typing `id`/FK ripples through
-  repositories, finders, and call sites) — tier by blast radius, not buried as advisory. The
-  ONLY non-finding is a field the code genuinely handles as a *string* over a uuid column
-  (explicitly justified). Report the total pair count so the migration has a completion
-  criterion (see the CI ratchet gate in `metaobjects-verify`).
-
-- [ ] **I. Vocabulary hygiene / modernization (ADVISORY).** Flag already-retired or
-  deprecated authoring patterns and recommend the canonical form (see § Vocabulary
-  hygiene). Advisory severity — scored as modernization opportunities, **never a
-  failing finding**.
+- **A.** Codegen candidates — API / server routes · **B.** Codegen candidates — web / client
+- **C.** Drift hotspot — validators, mappers, runtime models · **D.** Prompt pillar
+- **E.** Owned generators and scaffold-and-own · **E2.** Capability ledger (`requirement.*`, opt-in)
+- **F.** Drift-gate adoption · **F2.** Over-generation (codegen waste)
+- **G.** Runtime-contract anti-patterns · **G2.** `own*()` accessor discipline (a correctness defect, not advisory)
+- **H.** Authoring correctness / ADR conformance · **H2.** Wrong native type (`field.string` + `@dbColumnType: uuid`)
+- **I.** Vocabulary hygiene / modernization (advisory, never a failing finding)
 
 **Phase 4 — Synthesize** into the tiered roadmap and populate both artifacts.
-
----
-
-## Vocabulary hygiene / modernization (axis I — ADVISORY)
-
-Per ADR-0037, vocabulary expansion follows ONE ordered test (derivable → derive;
-physical-only → `@dbColumnType`; logical: different native type → subtype, same kind +
-modifier → attribute). This axis surfaces authoring that predates or contradicts that
-framework. **All findings here are advisory** — modernization opportunities scored as
-such, surfaced in the roadmap, but **non-failing** (the code works; the form is dated).
-
-**Already-retired / deprecated forms → recommend the canonical form:**
-
-- `@dbColumnType: uuid_array` / `@dbColumnType: text_array` (a physical array column
-  type) → **`isArray: true`** on the base subtype. Array-ness is logical and derivable;
-  the array column type is retired.
-- The `@kind: text` hack (forcing text via a kind override) → **bare `field.string`**
-  (text is the default; no override needed).
-- `@dbColumnType: uuid_array` was covered above. **`field.string` + `@dbColumnType: uuid`
-  is NOT advisory — it is a real mismodeling finding (see axis H).** It generates a `String`
-  where the code uses/wants a native `UUID`, forcing `String↔UUID` coercions at every
-  boundary; `verify --db` passes (the column really is uuid), so the schema gate can't see it.
-  The genuine string-over-uuid-column case (code truly handles the value as text) is the ONE
-  legitimate use and must be explicitly justified — otherwise recommend **`field.uuid`**.
-- `@dbColumnType: timestamp_with_tz` (ADR-0036 Wave 2) → **drop it.** `field.timestamp` is
-  instant / timezone-aware **by default** now; the `timestamp_with_tz` column-type override
-  is **retired**. Timezone-awareness lives in `field.timestamp` + the `@localTime` opt-out.
-- A bare `field.timestamp` that is **semantically a wall-clock value** (a store-open time, a
-  birthday-with-time, a recurring local schedule) → recommend **`@localTime: true`** (naive
-  `timestamp without time zone`), or confirm it is genuinely meant to be an instant. Default
-  `field.timestamp` is an instant; only flag when the field's meaning is clearly wall-clock.
-- A `validator.regex` (or a plain `field.string`) validating an **email** shape → recommend
-  **`@stringFormat: email`** on the `field.string` (ADR-0036 Wave 3). The native type stays
-  `string`; the per-port codegen emits the idiomatic email check — don't hand-roll the regex.
-- A `field.string` that **holds a URL / URI** → recommend **`field.uri`** (native `URI`/`Uri`,
-  URL validation) — a distinct native type + behavior is a subtype, not a validated string.
-- A `field.string` that **holds an IP address** → recommend **`field.inet`** (native IP type;
-  Postgres `inet` column).
-
-**Custom-provider vocabulary (adopters who register their own types/attrs):** check
-new/custom vocab against the ADR-0037 procedure (advisory) — e.g. *a custom subtype
-that differs from an existing one only by a property should be an attribute, not a
-subtype*; an email/hostname string-validation is an **attribute** (`@stringFormat`,
-native type unchanged), while a URL or IP is a **native type** (`field.uri` /
-`field.inet`, a subtype). Recommend re-shaping against the ordered test.
-
-**Hand-rolled reverse-query repository methods (ADR-0038) → recommend the generated reverse
-FK finder.** Reverse navigation — *"find all the rows that reference this one"* — is now
-codegen. Flag a hand-written reverse-query method (a `findByParentId` / `findBy<Parent>`
-repository finder, or a manual `WHERE fk = ?` query helper — exactly what a JVM adopter
-hand-writes in its `SceneRepository`) and recommend the **generated reverse FK finder**
-instead: codegen now emits `find<Source>By<FkField>` plus a batched `…In(ids)` variant from
-the FK metadata, idiomatic per port (Spring repository finder / EF query method / Python or
-TS query function). It is **performant** (one indexed query, no N+1) and **framework-free**
-(no lazy collections / proxies). When an entity has two FKs to the same target, the codegen
-emits two distinct finders (named by the FK field) automatically — no annotation needed; the
-reverse finder is a **codegen feature, not an attribute** (there is no reverse-nav `@`-attr
-to author). Advisory severity — a modernization opportunity, not a failing finding.
-
-**New-vocabulary OPPORTUNITY (the inverse hunt — advisory).** The checks above audit
-custom vocabulary the adopter *already* registered; this one hunts where the app
-**should** register vocabulary but hand-coded the pattern instead. Smells
-(grep-then-verify; require a *recurring, closed* set — never flag a one-off):
-- **N parallel hand-written integration modules** sharing a payload shape and a config
-  pattern (a closed set of channels / providers / export targets, each a near-copy with
-  a different transport) → candidate for ONE project-registered subtype whose variants
-  sit behind a closed structural-variant discriminator (the `source.rdb` `@kind`
-  pattern), plus a small owned generator emitting the per-variant wiring.
-- **An ad-hoc string discriminator steering code switches** — a string column whose
-  values select per-variant behavior/config scattered across the codebase. If the values
-  are just a closed symbol set, that is `field.enum` (`@values`), NOT new vocabulary. It
-  earns a subtype only when the discriminated concept **owns behavior or attributes of
-  its own** (ADR-0037 step 2a).
-- **A provider-shaped pattern re-implemented per instance** — repeated registration /
-  config blocks restating a shape one declared node per instance could carry, with codegen
-  emitting the repetition.
-- **A downstream integration modeled entirely in code** (an outbound webhook / notifier /
-  queue publisher / tool wiring beyond `template.toolcall`) where registered vocabulary +
-  a small generator would own the payload wiring, the names-only fail-closed config check,
-  and drift detection.
-
-Run the **ADR-0037 ordered test** before proposing: derivable → derive; differs from an
-existing subtype only by a property → an attribute; a plain validated value → an
-attribute; one-off author-supplied properties → the `attr.properties` bag. Only a concept
-with its own behavior/attributes earns a subtype, and transport/protocol is never the
-subtype axis (keep the node protocol- and address-free; variants behind the discriminator).
-**Converge before inventing** — check shipped vocabulary AND the planned/chartered names
-(see CALIBRATION "planned, not shipped"); never claim a chartered name for a project-local
-type. **Recommendation:** propose a project-registered provider (explicit loader wiring,
-ADR-0023 — never a loosened `strict` free-ride), a `metadata_sketch` of the node, and the
-owned generator that retires the duplication; a second independent consumer needing the
-same concept is a consumer→core promotion candidate (ADR-0011 — file an upstream issue).
-**Verdict: VOCAB CANDIDATE (advisory)** — a modeling opportunity, never a failing finding,
-never a tier gate; bias to under-flagging (the >15% false-positive kill criterion applies
-with full force). Full guidance: `docs/features/downstream-metadata-decisions.md`.
 
 ---
 
@@ -314,6 +131,7 @@ with full force). Full guidance: `docs/features/downstream-metadata-decisions.md
 | **CODEGEN CANDIDATE (high)** | Standard CRUD/list/form over a modeled or modelable entity. | Author the view + generate; parity-gate. |
 | **CODEGEN CANDIDATE (partial)** | Generatable data layer, bespoke presentation. | Generate data layer; keep viz hand-written. |
 | **DYNAMIC-RUNTIME CANDIDATE** | Behavior that could be metadata-driven at runtime. | Assess runtime-metadata feasibility. |
+| **ACCEPTABLE (one-off)** | A hand-written layer the metadata could own, but an owned generator for it would cost more lines than it replaces, no more instances are expected, and nothing drifts silently (it reads typed generated properties). | Report as acceptable. Not a defect, not a recommendation to generate. Re-class if it recurs or drift appears. |
 | **BESPOKE (keep)** | Genuine custom: irreducible SQL (recursive CTEs, window functions, set ops — NOT plain count/sum/avg rollups, which are `origin.aggregate` on a projection), graph, SSE, auth, search, viz. | Leave hand-written — still import generated types. |
 | **VOCAB CANDIDATE (advisory)** | A recurring, closed hand-coded pattern (parallel integration modules / an ad-hoc string discriminator) that project-registered vocabulary — a custom subtype/attr via a provider — plus a small owned generator would own. | Propose the provider + `metadata_sketch`; apply the ADR-0037 ordered test; advisory only. |
 
@@ -324,119 +142,41 @@ hidden candidate. **Stub trap:** demo-data routes have nothing to replace — cl
 
 ---
 
-## Drift signatures (highest-value; grep-then-verify)
-
-Per finding: `file:line` → what → generated-equivalent exists? → recommendation.
-
-1. **Hand validators shadowing a generated schema** — diff field-by-field; divergence is the bug.
-2. **Field-by-field serialize / deserialize / DTO↔model / row mappers** — silently drops a field when metadata grows one.
-3. **camelCase↔snake_case / body↔column maps** maintained beside a generated view that already renames.
-4. **Drift-admitting comments** — grep: `"keep in sync with"` / `"mirrors the"` / `"matching the"`.
-5. **Runtime schema patching** (`ALTER TABLE … ADD COLUMN IF NOT EXISTS`, `_ensure_schema()`) — N schema owners.
-6. **N declarations of one shape** — same entity as Drizzle table + Zod schema + Pydantic model + hand dataclass; target is 1 + N generated.
-7. **`own*()` accessor read of an effective property** (ADR-0039) — `ownAttr` / `ownFields` / `own_children` / bare Python `attr(` / `getMetaAttr(name, false)` / native `IsArray` used to read a value or iterate members outside the sanctioned subclass-emit / own-serializer / `@dbColumnType` cases → silently drops `extends`-inherited values. A **correctness defect** (axis G2), not advisory.
-8. **Hand-written `CREATE VIEW` / read-only SQL standing in for a projection or entity read-view (view-necessity test).** Grep migrations, checked-in `.sql`, and repository/query code for `CREATE [OR REPLACE] [MATERIALIZED] VIEW`, and for hand-rolled read-only queries that mirror a read model — a pure-`SELECT` repository/service method with joins or `GROUP BY` feeding a DTO, or a raw-SQL escape (`db.execute(sql…)`, `FromSqlRaw`, a JPA @Query with hand-written SQL). For each, run the **necessity test** — can origins express this shape? A column is derivable when it is (a) a base-entity or relationship-joined column → `origin.passthrough` (`@from` / `@via`), (b) a count/sum/avg/min/max over related rows → `origin.aggregate` (`@agg` / `@of` / `@via`), or an `EXISTS` / `array_agg` → `origin.aggregate` `any` / `all` / `collect` — any of them optionally row-scoped with `@filter`, (d) a computed scalar / **non-aggregate expression column** → `origin.computed` (`@expr`, #195), (e) one related row's column picked by an ordering — an **argmax / `DISTINCT ON … ORDER BY` / correlated `ORDER BY … LIMIT 1`** → `origin.first` (`@of` / `@via` / `@orderBy`, #195), or (f) a column borrowed via `extends` — and the joins follow declared relationships / `identity.reference` FKs.
-   - **Entity-shaped (`SELECT own.* + derived`) → an entity read-view, NOT a projection (#214).** The single most common legacy view is an entity's OWN columns plus a joined/derived extra (`SELECT o.*, c.name AS customer_name`). This is the `Order` **entity with a read route**, not an exposure contract — route it to an **entity read-view**: keep the writable `@role: primary` `@kind: table` source and add a **non-primary `@role: replica` `@kind: view`** source, declaring only the *extra* as a derived `origin.*` field on the entity (the own field set already covers `o.*`). Reads route to the replica view, writes to the table. Reach for a **projection** instead only when the view renames base columns or **row-filters** (`WHERE status='active'`, soft-delete) — the latter is a projection with an object-level `@filter` (#207) that lowers to the outer `WHERE`.
-   - **Exposure contract, expressible → CODEGEN CANDIDATE (high):** a subset / renamed / versioned / multi-base read model → convert to an `object.projection` with a read-only `source.rdb` `@kind: view` child, let `meta migrate` emit the `CREATE VIEW`, and consume the generated read-only query — the hand-written view is a second source of truth for a derivable shape. Parity-gate: the generated view returns row-identical results before the hand-written SQL is deleted.
-   - **Not expressible → carry it in `@sql` or `@unmanaged`, never a hand-edited migration (#208, ADR-0043).** When a NAMED irreducible construct blocks origin authoring — recursive CTE, window function / `OVER`, `UNION` / `INTERSECT` / `EXCEPT`, lateral join — the body still belongs in the metadata: carry the hand-written SQL in the `source.rdb` **`@sql`** escape — a read-only-`@kind` body the tool REGISTERS, fingerprints, and drift-checks (adopt a pre-existing view with `meta migrate --allow adopt-view`); `@sql` forbids `origin.*` children (two sources of truth). A DB object whose DDL is owned **entirely elsewhere** (Flyway / a hand-migration) → mark its source **`@unmanaged: true`** (legal on any `@kind` incl. `table`); `meta migrate` never creates/drops/drift-checks it and `verify --db` reports it as external. `@sql` and `@unmanaged` are mutually exclusive. **Only a view left *undeclared*** — neither modeled, nor `@sql`, nor `@unmanaged` — is truly *unmanaged*, invisible to `meta verify --db`, so this audit is the only gate that sees it. "It's an aggregation" is NOT an irreducibility justification (plain count/sum/avg/min/max rollups are `origin.aggregate`); nor is a `DISTINCT ON` pick-one-row (`origin.first`) or a non-aggregate expression column (`origin.computed`).
-9. **A closed variant-set hand-modeled per instance** — N sibling modules / classes / config blocks, one per channel / provider / target, sharing a payload + config shape and diverging only by transport. Grep for sibling-file families and switch-on-a-string dispatch; verify the set is closed and recurring (never a one-off). → axis I "New-vocabulary OPPORTUNITY" (VOCAB CANDIDATE, advisory).
-10. **N declarations of one FIELD across objects (same-name-field census)** — the field-level sibling of signature 6. Census field names across `object.*` nodes (`grep -rn 'name: <field>'` the metadata dir); a name recurring in ≥2 objects where a canonical owner exists — one whose name the field embeds (`<owner><Field>`: `wizardId` → `Wizard.id`, `orderTotal` → `Order.total`) or whose type+constraints it matches — is provenance loss → `extends: Owner.field` (dotted child targets, ADR-0029). **VERIFY by diffing the copies' attrs: a `@maxLength` / `@required` / validator divergence across them is drift already shipping — cite it.** Evidence multiplier: `extends` already used elsewhere in the repo raises confidence. Do NOT flag: generic names on unrelated concepts (`id` / `name` / `status` with no owner-embedding name and no matching constraints); required per-node attrs a loader forces (e.g. `payloadRef` / `format` on sibling `template.prompt` nodes — a product constraint, not a copy).
-11. **A metadata-derived value spelled a second time by hand.** A declaration is the single source of truth for every value the loader reads from it and every value a generator derives from it — the logical name, the physical table / schema / column / index names after the naming strategy, the resource path, an enum's member symbols, a label from `@title`, a limit from a validator child. Anywhere hand-written code or config carries a literal that must EQUAL one of those values, that literal is a second spelling, and a second spelling is drift waiting for the first one to move. **The three shapes this takes most often are raw SQL (a physical name), an API call or route mount (the resource path), and a hand-built form (a label, a limit, a message) — illustrative, never the set.** An adopter's other libraries carry the same defect in shapes this skill cannot list — a GraphQL resolver map, a search-index field, a cache or feature-flag key, a queue topic, a CSV `COPY` header, a form library's registration string, an LLM tool-parameter name — and the hunt has to reach those from the rule, because no menu will. Two generated surfaces hold the constants a site should reference instead: the per-object physical-names artifact (`<Entity>.names.ts` / `<Entity>Names` / `<entity_snake>_names.py` — table, schema, `fields[].column`, identity and index names) on all five ports; and on TypeScript the entity module's constants with their browser-safe `<Entity>.meta.ts` twin (`$entity`, `$table`, `$path`, and per field `name` / `label` / `view` / `htmlType` / `rules` / `options`), whose own docblock says to use them instead of magic strings. The other four ports answer that second surface with a generated typed handle — a Pydantic attribute, an EF property, an Exposed `Column` — which is already the gold standard.
-
-    **The discriminator is what happens when the declaration changes, not whether the string looks like a name.** Rename the thing in metadata and regenerate. A site is this signature only when it SURVIVES the regeneration and goes wrong later — on the request the router matches, the query the database parses, the row a reader mis-keys, the export a human mis-reads — or never goes wrong and simply lies. A site the regeneration itself breaks before anything runs is already gated and is NOT a finding. The mechanism behind the two outcomes is whether the hand-written spelling is RESOLVED at the site or COMPARED by a consumer the value travels to: an identifier on a typed handle, a value narrowed by a generated union, a key of a typed filter object are resolved — by the compiler where there is one, by import or attribute resolution of that line where there is not — and the toolchain names the site; a string a database parses, a router matches, a JSON consumer looks up, a broker routes or a human reads is compared, and the failure surfaces in the consumer, on the data, or nowhere. On TypeScript "resolved" means the compiler checks it, and that one test turned an estate's 332 bare enum-member strings (`status === "edited_approved"`) into 0 findings — each is narrowed by the generated `export type <Entity><Field> = "a" | "b"`, so renaming the member breaks the build at every site. The physical-name case is the opposite pole and the reason "fails loudly" cannot be the line: a renamed column DOES fail loudly — in production, on that query, from the database — which is exactly the failure this signature exists to prevent. The gate that counts fires from the regeneration alone.
-
-    **Hunt from the declaration outward, never from code shapes inward.** (1) Build the value list from the generated artifacts, because they already carry every derived value after every transform — naming strategy, pluralized path, humanized label: read `<Entity>Names` and, on TypeScript, the `.meta.ts` twin. Where the port emits no names artifact yet, derive the list from the metadata directly (`@table` / `@schema` / `@column`, else the naming strategy applied to the field name; `@values`; `@title`) and record the un-wired generator as the first finding (below). (2) Grep the non-generated tree once — code AND checked-in config, fixtures, YAML, JSON, `.env`, OpenAPI fragments — with an alternation of those VALUES as literals; distinctive values (`"email_address"`, `"/subscribers"`, `"edited_approved"`) score on the hit, generic ones (`"id"`, `"name"`, `255`) only by reading the consumer, never by count. This step is what finds the topic name, the index field, the `COPY` header and the flag key without knowing they exist. (3) Trace each hit to its CONSUMER and ask what that consumer matches it against. Matched against the schema, the generated route table, a generated wire shape or a generated label → the metadata owns it, apply the discriminator. Matched against something the app chose — its own page-route table, its own copy deck — → not owned, not this finding. (4) Only then run the shape greps — raw SQL, `fetch(` / `app.get(` / a `queryKey`, a hand validator — as the second pass, for what a value grep cannot see: a literal that has ALREADY drifted from the declared value, a concatenated or interpolated name, a case-transformed one.
-
-    **Do not flag — one rule, and its consequences.** A literal is exempt when (a) it is resolved, not compared: a typed ORM handle (a Drizzle column object, an Exposed `Column`, an EF property, a Pydantic attribute), a typed property access (`row.email`, `form.input.email`), a typed filter object, an enum member narrowed by the generated union — rewriting any of these to `Subscriber.email.name` or a string lookup swaps a checked reference for an unchecked one and is a regression (the emitted `options: [...] as const` populates a dropdown; it does not replace checked literals); (b) the metadata does not OWN it — the value coincides with a derived one but the app may change it without the metadata being wrong: a client-side page route or link (`<Route path="/programs">`, `<a href="/programs">`) is a navigation URL the app chose, measured on an estate where all 11 apparent `$path` hits were exactly this and the true count was 0, and converting one couples the site's URL structure to the API's; likewise the deployment prefix of a fetch URL, which the constants surface deliberately does not carry — `/api` is supplied at runtime through the client provider's `baseUrl`, never frozen at `meta gen` — so `fetch("/api/subscribers")` decomposes into a prefix with no constant by design and a `/subscribers` that is `$path`; (c) no generated constant exists for it — next paragraph; (d) it sits where a constant cannot be imported or names something no single declaration owns: a `source.rdb` `@sql` body is metadata, fingerprinted precisely because it can reference nothing; a flattened value-object composite column belongs to no single field of either object; a relationship-synthesized FK column is derived, never declared; a write-through entity's replica view name is not in the artifact, which holds the PRIMARY source's. A hand-written repository that imports `<Entity>Names` is the gold standard — call it out as good.
-
-    **Score only where a constant actually exists.** A fact declared in the project's CODEGEN CONFIG rather than in metadata — a bespoke route mount path, a hand-chosen JSON envelope key — is genuinely spelled twice when a client re-types it, but no generated constant holds it. That is a GENERATOR GAP, reported as one, never a literal-site finding: never invent a constant that the emitters do not emit.
-
-    **No verify subverb sees this** — `--codegen` diffs generated files, `--db` compares schema to metadata — so this audit is the only gate. Remedy: reference the constant — but **check the artifact is emitted at all before scoring the literals, because on ALL FIVE ports an existing project emits none until it asks**. ADR-0034 Amendment 2 made codegen opt-in everywhere: C# and Python require `--generators`, TypeScript's `generators: [...]` and the JVM's `<generators>` are each the COMPLETE list, and `meta init` scaffolds `generators: []` — so no port begins emitting this artifact merely because the package was upgraded. Where no artifact exists, the un-wired generator is the FIRST finding and the first remedy (`namesFile()` on TS after `meta eject names`; `SpringNamesGenerator` / `KotlinNamesGenerator` in the pom) — score the literals under it rather than as N independent findings, since one config line fixes the cause and generated code stops embedding the names too.
-
-    **Report TWO numbers for this signature, always, and never just the first: (a) is the artifact EMITTED, and (b) how many of the literal sites actually IMPORT it — the adoption ratio, as `<adopted>/<total> sites`.** Emission is the cheap half and it is the half that gets done: measured on an adopter whose audit proved the artifact emitted correctly, ran the generator to show it, and then adopted it at **0 of 53 sites** (37 table + 16 column). Wiring the generator changes the scorecard; it changes nothing a reader of the code experiences, because the second spelling is still the one every query uses. An audit that reports only (a) makes the estate look upgraded while every literal it found is still there — so a project that emits the artifact and imports it nowhere scores WORSE than one that has not started, not better, because it now carries a third spelling that claims to be the source of truth.
-
-    **A deferral must carry its measurement forward.** "Wire the names tier" is a real thing to postpone — on the observed estate it meant a new generated tier, a new dev-loop step, a new `verify --codegen` gate and edits to 4 service and 6 test modules that could only be validated against a live database, and the branch in hand deliberately changed nothing in the running application. That is a legitimate decision and belongs in the report. But record it with **the site count, the exact command that emits the artifact, and the modules that would change** — never as intent alone — and **re-raise it in every later audit until the ratio moves**. A deferral with no number attached reads as a nice-to-have on the next reading and silently becomes permanent; the one carrying `0/53` does not.
-
-
-12. **An "open JSON bag" whose readers all agree on a shape.** `field.string` + `@dbColumnType: jsonb` is SANCTIONED vocabulary, not a defect — it is the deliberate escape hatch for a genuinely untyped JSON column with no value object to reference, it emits `unknown` / `z.unknown()` by design, and a cross-port corpus (`fixtures/api-contract-conformance/jsonb/`) gates that contract. **Never flag the pattern on sight.** Flag it only when the bag is not actually open: when the code demonstrably knows the shape. **Look at the WRITER FIRST — it is the strongest and cheapest evidence, and a reader-only hunt badly under-counts.** The function that writes the column declares the value's type in its own signature: `related_memory_ids: list[str]`, `vector_scores: list[float]`, `tools_offered: list[dict[str, Any]]`, `preferences: dict[str, Preference]`, a serialized dataclass / DTO / `@Serializable` class. If the writer's type is anything but a genuinely open map, the metadata is claiming less than the code already knows. Reader-side tells come second: a FIXED KEY SET in raw-SQL JSON-path reads (`->>'decision'`, `#>>'{a,b}'`), casts to a concrete type (`row.output as { draftText?: string }`), destructuring, typed parsing (`model_validate`, `readValue(…, X.class)`, `decodeFromString<T>`), or a hand-written validator over the parsed value. Measured: hunting reader-side raw SQL ALONE found 2 columns on an estate; adding the writer signatures found many more on the same estate, because raw-SQL JSON paths are the rarest way to consume a jsonb column — most consumers parse it into a type.
-
-    **The `isArray` sub-case is the commonest and is mechanical.** A bag whose writer types it `list[str]` / `string[]` / `List<X>` is not an object and not an open bag: it is the BASE SUBTYPE plus `isArray: true` (`field.string @isArray`, `field.double @isArray`). Declaring it as an open jsonb bag loses the element type entirely, so nothing stops a writer putting a map where every reader expects a list. A plural field name (`scopes`, `relatedMemoryIds`, `participantEmails`, `capabilities`) plus a typed-collection writer is the whole test. A `*Json` SUFFIX is a second free tell — a field named `conditionJson` / `configJson` / `definitionJson` is admitting it carries a structured shape. At that point the shape exists; it is simply declared in N readers instead of once in the metadata, which is drift signature 6 with zero declarations rather than several — and it is invisible to every gate, because `verify --db` sees a jsonb column that matches and `--codegen` sees generated files that are correct for an open bag.
-
-    **Measured on one estate:** 6 such columns, and one of them (`AuditEntry.output`) carried **12 distinct keys across 31 raw-SQL path reads plus 7 casts** in 10 files. Nothing in that is open. Estate-wide the pattern is common — 74 `field.string` + jsonb fields across five of nine projects — which is exactly why the discriminator matters more than the count: report the ones whose readers pin a shape, not the ones whose readers treat the value as opaque.
-
-    **Do NOT flag:** a bag whose readers genuinely pass it through (logged, echoed, stored, forwarded to a third party) without reading a key; a third-party or LLM raw response whose shape is not the adopter's to declare; an **array of scalars**, which is `isArray: true` on the base subtype and never an object; a bag the metadata's own comment justifies as open with a reason.
-
-    **Remedy — a ladder, chosen by the WRITER's declared type, and every rung gives the consumer a TYPED HANDLE rather than a string to get and set.** `list[X]` ⇒ the base subtype + `isArray: true`. `dict[str, X]` with a known `X` ⇒ **`field.map` + `@objectRef`** (a value object) or `@valueType` (a scalar) — registered vocabulary that emits `jsonb("col").$type<Record<string, X>>()` and `z.record(z.string(), X)`. **Check the CONSUMER before recommending this rung: `field.map` codegen now completes on all five ports** (Java types it `java.util.Map<String, V>`; C# emits the `Dictionary<string, V>` property and its EF jsonb storage mapping), **but no persistence- or api-contract-conformance fixture exercises `field.map` on ANY port, and the runtime persistence tier is uneven** — only Python's `ObjectManager` encodes a map, while `runtime-ts`, Java's OMDB and the Kotlin Exposed lane carry none. So where GENERATED CODE is the consumer, check the port before recommending this rung — nested map values are validated on every write path on every port as of 1.0.1 ([#362](https://github.com/metaobjectsdev/metaobjects/issues/362) — before that, Java skipped the cascade on TPH write paths and C# skipped it everywhere, silently accepting invalid values rather than erroring). **Check the adopter's pinned version before recommending this rung to a Java-TPH or C# consumer: on 1.0.0 the hole is open and they need their own boundary check.** Prefer a value object where a PORT RUNTIME must read the column back; a genuinely dynamic key set stays a bag. A serialized DTO / dataclass / `@Serializable` class ⇒ declare it as an `object.value` and point the field at it with `field.object` + `@objectRef` + `@storage: jsonb`. Only `dict[str, Any]` whose readers pin no key stays an open bag. **What the adopter GETS, per port** — this is the point of the conversion and worth stating in the finding: TypeScript emits the Drizzle column as `.$type<VO>()` plus the VO's own Zod schema and inferred type; Python annotates the field with the referenced VO's Pydantic model (and its `<Ref>Create` on the wire, so a nested violation still validates); Kotlin emits typed Exposed jsonb codecs backed by a shared Jackson `MetaJsonbMapper`. In none of them does the consumer touch a JSON string — that is what the open bag costs them today, since `unknown` forces every reader to cast. The column stays jsonb, so this is a codegen/contract change and not necessarily a migration; what changes is that `unknown` becomes a generated type, the casts delete, and the keys become metadata-owned — which also promotes their literals into drift signature 11's scope, where the `->>'key'` sites were previously exempt because the metadata owned nothing. **Verify the column type is genuinely unchanged before promising no migration**, and parity-gate each converted read against the raw-SQL one before deleting it. Convert one column at a time: the shape is a judgment per bag, and a wrong guess declares a contract the writers do not honor.
-
----
-
 ## Owned-codegen & scaffold-and-own assessment
 
-- If config imports `entityFile` / `queriesFile` / `routesFile` / `barrel` from
-  `@metaobjectsdev/codegen-ts/generators` instead of owned `codegen/generators/*`,
-  recommend the scaffold-and-own migration (`meta init`, or `meta eject <name>`) — on 1.0+
-  those four no longer resolve. Importing the non-ownable generators from that subpath is
-  correct and is not a finding.
+- A config may import `entityFile` / `queriesFile` / `routesFile` / `barrel` from
+  `@metaobjectsdev/codegen-ts/generators` or from owned `codegen/generators/*`. Both are
+  supported from 1.1, and the import is the right choice for a generator the project does
+  not change. The import is a blocker only on a 1.0.x install, where those four do not
+  resolve: recommend upgrading to 1.1, or `meta eject <name>` if the project has to stay
+  on 1.0.x. On 1.1 the finding is the reverse case, an owned copy proven unmodified by
+  the Phase 0 owned-generators check: recommend the package import. Importing any other
+  generator from that subpath is correct and is not a finding.
 - Audit owned generators: (a) regenerate clean? (b) drifted from reference templates —
   intentional (good) vs stale/accidental (missed upstream fix)? (c) hand-rolling a walk
   that a declarative `scope` + `outputPattern` could replace? (d) bespoke shape better as
   a `templateGenerator` than a forked generator?
-- **Authoring ladder:** built-in fits → use it · close → **own + customize** (the default)
+- **Authoring ladder:** built-in fits → import it as shipped · close → **eject it and
+  customize the copy**
   · new shape → **author a declarative template-spec / custom generator from the metadata**
   · genuinely un-modelable → hand-write (still import the generated types).
 - **Generator-gap check:** missing generators that block the biggest wins? Recommend per gap:
-  own + customize / author a template-spec / fix upstream / stopgap.
+  own + customize / author a template-spec / fix upstream / stopgap. **Cost-test every
+  recommendation to generate** (`metaobjects-codegen` → `references/owning-generators.md`): an
+  owned generator is worth it only if generator + output is smaller than the code it replaces,
+  more instances are expected, or drift protection is the point. A layer that fails is
+  ACCEPTABLE, and an owned generator larger than the code it replaced is itself a finding.
+  A general-shape generator belongs in the library, not in each app.
 - **Verify the DB artifact, not just the types** — computed view columns may appear in the
   contract but be dropped from the view DDL; the contract may lie.
 - **An *undeclared* hand-authored DB view is invisible to `meta verify --db`.** A view that is
   neither modeled nor carried in the `source.rdb` `@sql` / `@unmanaged` escapes is *unmanaged*
   (informational only — never actionable drift, never auto-dropped), so a hand-written view
   standing in for an expressible `object.projection` / entity read-view can never be outsourced
-  to the drift gate; hunt it here (drift signature 8, below). Once carried in `@sql` (#208) it IS
+  to the drift gate; hunt it here (drift signature 8 in `references/drift-signatures.md`). Once carried in `@sql` (#208) it IS
   registered, fingerprinted, and drift-checked — no longer audit-only.
 - **Version skew:** check *actually-resolved* package versions, not declared; consuming a fix
   requires a coordinated lockstep bump, not a source-file copy.
-
----
-
-## Prompt anti-patterns (hunt per site; classify: fully-modeled / partial / fully-inline)
-
-**The census covers EVERY module**, not only the application: test harnesses, simulators,
-evaluation and seeding scripts, and tooling. A census scoped to "the app" is how hand-built
-prompts, and the regex that parses their replies, survive a migration that reports itself
-complete. A site is anything that builds text sent to an LLM (format string, f-string, text
-block, template literal, string builder, concatenation) or reads its reply (regex, string
-search, hand-rolled JSON/XML parsing).
-
-**Say what keeps the result in place.** An audit is a one-off; nothing in `meta verify` flags
-a NEW hand-built prompt. When the census comes back clean, check that the project's always-on
-context carries the prompt rule (regenerated by `meta init --refresh-docs`) and recommend a
-project-local guard where agents keep adding prompts — a check that flags a literal or
-format-built argument at the project's own LLM request call sites.
-
-- Inline prompt strings (triple-quoted / template-literal constants in service code).
-- Untyped payloads (`str.format(**dict)` / f-strings / ad-hoc dicts) — payload should be a declared
-  shape: an `object.value` (caller-supplied fields; `origin.passthrough` only — FR-015 parameter
-  lineage) or, when fields derive by `aggregate` / `computed` / `first`, a
-  **sourceless `object.projection`** carrying those origins (#210 — assembly origins on an
-  `object.value` fail load with `ERR_SUBTYPE_RULE_VIOLATION`; `@payloadRef` accepts the sourceless
-  projection).
-- Silent-degradation hack (`try/except KeyError` or `?? ''` around formatting) — flag every instance.
-- Hand-rolled output parsing (regex / XML / ad-hoc JSON) vs a declared **responding
-  `template.prompt`** (one carrying `@responseRef`) + generated `parse*` / `safeParse*` /
-  `extract*` parser — **generated in all five ports** (Java's generated `<Name>Parser` owns
-  the Jackson `readValue`); flag a hand-rolled parser in a **non-generated** file where a
-  responding `template.prompt` exists. ADR-0052: a `template.output` is outbound only and
-  generates no parser, so it is not the node to look for here.
-- Engine-side formatting breaking byte-identical render (prompt-cache exact-prefix hits
-  depend on byte-stability).
-- `template.toolcall` candidates: LLM tool schemas hand-defined per call vs modeled
-  `toolcall @toolName/@payloadRef`.
-- `@responseRef` + AI-trace: hand-parsed responses with no typed response shape; note that
-  `voRequest` / `voResponse` jsonb columns must be authored `field.object` — the loader
-  must not mutate the tree; vendor SDK client + pricing are BYO (ADR-0024).
-- No `meta verify --templates` gate; no declared `@maxChars` / `@maxTokens` budget.
-- **Template-text duplication.** Hash every external template file (`md5sum` the template dir) and diff within groups sharing a `payloadRef`. A byte-identical cluster, or N≥3 templates sharing an identical skeleton with only slot lines differing, is ONE prompt maintained N times — a wording fix must be applied N times and WILL be missed. Recommend a shared `{{> group/partial }}` include (the render engine inlines partials recursively) or one template + payload-carried variant fields. Do NOT flag: the per-node `payloadRef` / `@format` repetition across `template.prompt` nodes (loader-forced, not a copy); templates meant to diverge independently — require N≥3 and structural identity before flagging.
 
 ---
 
@@ -519,52 +259,3 @@ The audit never edits code. Pattern: **dry-run → review the diff → apply**.
 - Cut over **one surface at a time, one commit each**.
 - A separate guided-cutover skill (not this one) reads `adoption-audit.json` and walks
   findings one tier/surface at a time with human approval at each step.
-
----
-
-## Guardrails
-
-- **Adoption direction — metadata follows the code.** This is a brownfield project: existing
-  code and the live schema are the spec. Every `metadata_sketch` must **reproduce the code's
-  existing native types, names, and nullability** (model `field.uuid` where the code uses
-  `UUID`, carry over `@column`/`@table`/`@required`) and every cutover must **minimize churn to
-  code the generator is not replacing** — customize the codegen to match the existing shape
-  before proposing edits to working call sites. A sketch that would re-type or rename working
-  code the generator isn't replacing is modeling the wrong thing; when a choice is ambiguous,
-  flag it for the human rather than proposing the churnier option. (Full doctrine:
-  `metaobjects-authoring` → "Adopting onto an existing codebase".)
-- **Parity-gate every cutover** — prove behavior-equivalent before deleting hand-written code; generated schemas are often looser.
-- **Verify, don't assume** — read the code behind a grep hit.
-- **Verify the DB artifact, not just the types** — the contract may claim a column the view DDL dropped.
-- **Don't let one bespoke action block generating the entity** — generate CRUD; mount the custom action alongside.
-- **Consumption ≠ a dist copy across versions** — bump + rebuild lockstep and install.
-
----
-
-## Calibration — port gaps & non-defects (do NOT flag these as adopter fault)
-
-- **Filter-operator route codegen — the baseline grammar ships in all five ports.** The
-  `?filter[field][op]=value` grammar (all 9 operators `eq/ne/gt/gte/lt/lte/in/like/isNull`,
-  implicit-AND across params, the generated `<Entity>FilterAllowlist` + `invalid-field` /
-  `invalid-op` / `in`-over-cap 400s) is **generated in every port** (Java `SpringControllerGenerator`,
-  C# `RoutesGenerator`, Python `router_generator`, Kotlin `KotlinSpringControllerGenerator`, TS) —
-  gated by the api-contract corpus in BOTH lanes. **Flag hand-rolled filter parsing anywhere.**
-  Only the *richer* surface is genuinely **TS-only**: free-text `?search=`, the explicit
-  `filter[or][N]` / `filter[and][N]` nested boolean combinators (+ their nesting-depth cap), and
-  leading-wildcard gating — do NOT flag the absence of those in a non-TS port.
-- **Output-parser codegen** ships in **all five ports** — Java's `SpringOutputParserGenerator`
-  *generates* the `<Name>Parser` (the Jackson `readValue` lives inside that generated file). A
-  hand-rolled parser in a **non-generated** file where a **responding `template.prompt`**
-  (`@responseRef`) exists IS a finding. Per ADR-0052 a `template.output` emits no parser.
-- **Python** still hand-wires the FastAPI router + repository impl around a generated
-  `APIRouter`; relationship / non-`table` source-kind / `field.object flattened` codegen is partial.
-- **C#** has no ObjectManager runtime tier (EF Core is the runtime) — hand services over the generated `DbContext` are expected.
-- **Cut subtypes** — `field.byte` / `field.short` / `field.class` are removed; never recommend them.
-- **TS/web-only** — `view.*` widget subtypes exist only for TS/web consumers; only `view.base` / `view.currency` are cross-port-gated.
-- **Planned, not shipped** — `api.*` / `operation.*` / `binding.*` (FR-024) and MCP exposure of declared prompts/tools are not yet in the registry; their absence is not an adopter defect.
-- **Cross-port version-NUMBER skew is by design** — TS/C#/Python `0.x` vs Java/Kotlin `7.x` Maven is correct; never flag the *number lines* differing. But that is exactly why you can't eyeball cross-language drift: compare **`metamodelVersion`** (Phase 0 cross-language consistency item), not the package numbers. A `metamodelVersion` MISMATCH across ports *is* a finding; so is a port lagging its ecosystem's latest release. Also flag *intra-port* drift (mixed versions within one port, or a runtime package in `devDependencies`).
-- **Stale upstream prose** — "hand-write the Spring controller" (Java/Kotlin) is out of date; trust `meta gen --list`, not stale prose.
-
----
-
-For this project's port specifics and the exhaustive capability checklist, read every `references/*.md` in this skill's directory.

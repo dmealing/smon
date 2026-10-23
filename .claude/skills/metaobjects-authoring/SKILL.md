@@ -10,7 +10,9 @@ that drive code generation, runtime behavior, and drift detection. You author it
 the loader reads it, the codegen emits idiomatic per-language code from it. This
 skill is the procedure for writing it correctly.
 
-Metadata lives in files under `metaobjects/` at project root, one file per domain
+Metadata lives in files under the project's metadata directory (`metaobjects/` unless
+the project's configuration names another: `sources` in `.metaobjects/config.json`, or the
+port's own setting), one file per domain
 concept (`meta.commerce.json`, `meta.users.yaml`, …). Each file declares a
 `package` on its root node. Files in the same `package` with the same object
 `name` are merged by the loader.
@@ -25,10 +27,16 @@ This file covers what almost every model needs. The topics below live in
 | `references/adopting-existing-code.md` | working code or a populated schema already exists for what you are modeling |
 | `references/choosing-a-shape.md` | no row of "Canonical form for common field needs" fits; you need the full UUID / timestamp / URI / `@autoSet` rule; or you are registering your own vocabulary |
 | `references/json-columns.md` | a JSON column beyond the ladder below: coverage per port, `field.map` at runtime, version caveats, bag → native array |
+| `references/identities-and-indexes.md` | declaring a primary, secondary or reference identity, an FK, or a non-unique `index.lookup` |
+| `references/sources.md` | the `source.rdb` shape and `@kind`; a store MetaObjects does not manage; a derived or computed column (reach for an entity read-view first) |
+| `references/abstracts-and-overlay.md` | a shared `abstract` base, `extends`, or a layered `overlay` file |
+| `references/declaring-reports.md` | declaring `dimension.*`, `measure.*`, `segment.filter` or an `object.report` |
+| `references/model-first-rationale.md` | someone argues that hand-writing a layer is cheaper this once |
 | `references/relationships.md` | a many-to-many link or self-join, or a "rows that reference this one" query |
 | `references/read-views-and-projections.md` | an `object.projection`, `origin.*` vocabulary, `@filter` / `@expr`, or an `@sql` / `@unmanaged` view |
 | `references/inheritance-tph.md` | several entities are variants of one thing sharing a single table (`@discriminator`) |
 | `references/metadata-dependencies.md` | the project builds on another package's metadata (`dependencies`, cross-package `overlay`) |
+| `references/reporting.md` | what a declared report gives you: what columns a report gets, time grains, null rules, rows with no facts (`@spine`), defaults (`@default`), engine differences |
 | `references/requirements.md` | installed only when the project declares `requirement.*` nodes |
 
 ## The operating principle: model-first, generate-first
@@ -44,20 +52,6 @@ this endpoint?"* Model-first asks *"what is this resource, and what is true abou
 it?"* — and lets codegen own the *how*. **Describe WHAT, not HOW.** The metadata is
 the source of truth; generated code is a disposable, regenerable artifact — delete
 it and `meta gen` restores it identically.
-
-**Why model-first wins even when hand-writing is cheaper this once — and it often
-is, this once:**
-- **Hand-writing a layer the metadata could own creates a second source of truth for
-  one fact.** A field's type, validation, column, route, and form then change in N
-  places and must stay consistent forever — not drift *risk*, but two sources of
-  truth for one fact, broken by construction.
-- **The hand-roll saving is paid once; the consistency tax is paid on every future
-  change.** Assume the system will grow — it always does. The metadata amortizes
-  toward zero as the model is reused across layers and time; the hand-rolled
-  liability compounds with every field, refactor, and language port.
-- **One metadata change regenerates persistence + DAO + API + UI consistently** —
-  and inherits every future generator improvement. Hand-writing opts out of all of
-  it, permanently.
 
 **Before you hand-write anything data-shaped, STOP and find the model.** The moment
 you reach for a hand-written query, route, validator, form, relationship, or
@@ -372,88 +366,10 @@ keys, bare attributes. Two house-style rules:
 The `[]` key-suffix declares an array field: `field.long[]: weekIds` lowers to
 `{ "field.long": { "name": "weekIds", "isArray": true } }`.
 
-## Identities
-
-| Subtype | Purpose | Key attrs |
-|---|---|---|
-| `identity.primary` | the PK field(s) | `@fields`, `@generation` |
-| `identity.secondary` | a unique alternate key (always enforces uniqueness — uniqueness is the type, not a `@unique` attr) | `@fields` (or `@expr` for a functional index) |
-| `identity.reference` | an inbound FK from this entity to another | `@fields`, `@references`, `@enforce` |
-
-`@generation` on a primary controls value generation (e.g. `increment`).
-`@fields` accepts a single string in authoring; it normalizes to an array in
-canonical JSON. `@enforce` on a reference (default `true`) controls whether the
-backend physically enforces it (a SQL FK constraint); set `false` for a logical
-reference for navigation/typing/codegen only. Referential actions
-(`@onDelete`/`@onUpdate`) normally live on the `relationship.*` node (see
-Relationships below — the subtype carries the default), but `identity.reference`
-also registers them as the **explicit per-FK override** (ADR-0047): use them for
-a reference-only FK with no relationship, an M:N junction's FK sides (no
-relationship ever correlates with a junction FK), or a single FK that must
-deviate from its relationship's action. A reference-level action always wins
-over the correlated relationship's.
-
-`@references` resolves cross-package by **fully-qualified name**
-(`@references: "shared::billing::Account"`), the same rule as `extends`; a bare
-name resolves within the current package. The FK target must be an entity with a
-single-column primary key (the FK points at that PK); a target with a composite
-PK needs the explicit dotted form `@references: "pkg::Target.fieldA,fieldB"`.
-
-**A dangling reference fails the load (0.11.0+).** An unresolved
-`identity.reference.@references` raises `ERR_INVALID_REFERENCE` and an unresolved
-`relationship.@objectRef` raises `ERR_INVALID_RELATIONSHIP` — the target entity must
-exist (previously such references loaded silently). So every `@references` /
-`@objectRef` you author must name a real entity.
-
-An `identity.secondary` can index an **expression** instead of plain columns: use
-`@expr` (e.g. `"lower(email)"`) in place of `@fields`, optionally with `@using` (the
-index method — `gin` / `gist` / `hash`; default `btree`) and `@where` (a partial-index
-predicate).
-
-```json
-{ "identity.primary":   { "name": "id", "@fields": ["id"], "@generation": "increment" } }
-{ "identity.secondary": { "name": "byEmail", "@fields": ["email"] } }
-{ "identity.secondary": { "name": "byEmailCI", "@expr": "lower(email)" } }
-{ "identity.reference": { "name": "fkAuthor", "@fields": ["authorId"], "@references": "Author", "@enforce": true } }
-```
-
-## Indexes (non-unique)
-
-Use `index.lookup` for a **non-unique** DB index added purely for query performance — it
-does NOT enforce uniqueness. Choose the right construct by what the constraint IS:
-
-| Need | Construct |
-|---|---|
-| Unique alternate key (e.g. email, slug) | `identity.secondary` — uniqueness is the type |
-| Query-performance index, no uniqueness | `index.lookup` |
-
-**An index keys off EXACTLY ONE of `@fields` or `@expr`.** `@fields` names the indexed
-columns; `@expr` is a raw key expression used **instead of** `@fields` (a functional index).
-Declaring **neither** — or **both** — is `ERR_INVALID_INDEX`. This applies to
-`identity.secondary` as well as `index.lookup`: uniqueness lives in the type, so a unique
-index keys itself the same way.
-
-A legacy index declaring both is fixed by `meta upgrade --apply`, which keeps `@expr` (the
-index the database actually has). Do not hand-pick the survivor.
-
-The db provider contributes physical-tuning attrs alongside either form: `@orders`
-(per-column sort direction), `@using` (access method — `gin`/`gist`/`hash`; default
-`btree`), and `@where` (partial-index predicate).
-
-```json
-{ "index.lookup": { "name": "byCreatedAt", "@fields": ["createdAt"], "@orders": ["desc"] } }
-{ "index.lookup": { "name": "byStatusCreatedAt", "@fields": ["status", "createdAt"] } }
-{ "index.lookup": { "name": "byEmailCI", "@expr": "lower(email)" } }
-{ "identity.secondary": { "name": "uniqLowerEmail", "@expr": "lower(email)" } }
-```
-
-`index.lookup` is a sibling of `identity.*` — declare it as a direct child of an `object.entity`,
-at the same level as fields and identities.
-
 ## Relationships
 
 A `relationship.*` child is the navigation / ownership side of a link to another
-entity; `identity.reference` (above) is the FK-column side. They are the two halves
+entity; `identity.reference` (see `references/identities-and-indexes.md`) is the FK-column side. They are the two halves
 of one FK. **Choose the subtype by ownership semantics — it decides the default
 referential action**, so modeling every FK as `composition` silently arms unintended
 `CASCADE` deletes:
@@ -527,149 +443,6 @@ enforcement (a CHECK constraint / cross-field assertion) — no raw expression i
 
 These are children of `object.entity`, alongside its fields and identities.
 
-## Sources — `source.rdb` + `@kind`
-
-`source.rdb` declares where an entity's data lives. Read-only-ness derives from
-`@kind` (it is NOT a separate subtype):
-
-| `@kind` | Read-only | Default? |
-|---|---|---|
-| `table` | no | yes (when `@kind` omitted) |
-| `view` | yes | – |
-| `materializedView` | yes | – |
-| `storedProc` | yes | – |
-| `tableFunction` | yes | – |
-
-The physical name attr is **kind-matched** — never `@name`: `@table` for a table,
-`@view` for a view, `@materializedView`, `@proc` (storedProc), `@function`
-(tableFunction). (`@table` on a non-table kind is a pre-1.0 legacy spelling the
-canonical serializer rewrites to the kind's alias; author the kind-matched attr
-directly.) The physical column name on a field is `@column`. `@schema` namespaces
-the DB schema (Postgres default `public`; SQLite rejects non-default values).
-Multi-source: multiple `source.rdb` children, each with a `@role`, exactly one
-`primary`.
-
-```json
-{ "source.rdb": { "@kind": "view", "@view": "v_author", "@schema": "blog" } }
-```
-
-**This declaration is the only place a physical name is ever spelled.** Codegen emits a
-per-object names artifact from it (`<Entity>Names` — `ProgramNames.fields.createdAt.column`,
-`ProgramNames.CreatedAtColumn`, `PROGRAM_CREATED_AT_COLUMN`, per port), the generated table
-binding reads that artifact, and hand-written SQL, repositories and migration scripts
-reference it — so a consumer never restates `v_author` or `created_at`, and a rename here
-propagates. Declare `@column` explicitly whenever the physical name is not the naming
-strategy's answer (`callPurpose` → `purpose_code`): nothing downstream can recover that
-mapping by derivation, and the constant is what carries it. (See `metaobjects-codegen` →
-"Never hand-write a physical name".)
-
-**An entity's PRIMARY source must be writable** (`table`) — read-only kinds are
-legal only in non-primary roles.
-
-### A store MetaObjects does not manage — MongoDB, Cassandra, Neo4j, an API
-
-`source.rdb` is the only registered source. A record kept in a document, wide-column or
-graph store, or behind a remote API, is an `object.entity` with an `identity.primary` and
-**no `source.*` child**: a *sourceless entity*. Do not invent a document or graph source
-subtype, or a `@collection` attr: ADR-0007 designs them but registers only `rdb`, so the
-loader refuses them. Put
-store settings in your own property bag instead: any `@name` whose value is a JSON object is
-a registered `attr.properties` bag, for example `"@mongo": { "collection": "orders" }`.
-
-A sourceless entity gets no table, queries, routes or migration. It still gets its wire
-contract in every port: the create and PATCH schemas and the filter allowlist. Keep the
-`identity.primary`, because it is what makes the record addressable. Without it the object
-is a shape only. The data access layer is a generator you own: the procedure is in the
-`metaobjects-codegen` skill, `references/any-stack.md`, and on TypeScript
-`references/typescript-document-store.md` carries a complete, tested MongoDB repository
-generator to copy.
-
-**The database dialect is codegen config, not metadata.** MySQL, Postgres, SQLite and D1
-entities are all modeled with `source.rdb`; `dialect` in the codegen config picks the target.
-Do not encode the database in the model.
-
-### Derived/computed columns: reach for an ENTITY READ-VIEW first
-
-**Do not default to `object.projection` for a list screen, grid, or "one extra
-column" read.** The usual need — an entity's own rows plus a joined display name or a
-per-row count, filterable and sortable like any other column — is an **entity
-read-view**, not a projection:
-
-```jsonc
-{ "object.entity": { "name": "Order", "children": [
-  { "source.rdb": { "@kind": "table", "@table": "orders" } },              // writes
-  { "source.rdb": { "@kind": "view", "@view": "v_order", "@role": "replica" } },  // reads
-  // …the entity's own fields stay as they are — you re-state NOTHING…
-  { "field.string": { "name": "customerName", "@filterable": true, "children": [
-    { "origin.passthrough": { "@from": "Customer.name" } } ]}},
-  { "field.int": { "name": "itemCount", "@filterable": true, "children": [
-    { "origin.aggregate": { "@agg": "count", "@of": "OrderItem.id", "@via": "Order.items" } } ]}}
-]}}
-```
-
-That is the whole change. Writes route to the table (derived fields are excluded from
-the write codecs); reads route to the view; `meta migrate` emits the `CREATE VIEW` from
-the **same assembly logic** a projection view uses — one emitter, two hosts (FR-024 §7,
-#213/#214). Filtering and sorting on `customerName` / `itemCount` work like any other
-column because the filter tier runs against the view.
-
-**When you need an independent exposure** — a subset, renamed columns, a row-filtered
-view, a versioned or external shape — that is an `object.projection`. It, the `origin.*`
-vocabulary, the structured `@filter` / `@expr` shapes and the `@sql` / `@unmanaged` escapes
-are in `references/read-views-and-projections.md`.
-
-## Abstracts + `extends` (deferred resolution) + `overlay`
-
-An **abstract** node (`abstract: true`) describes a shape but is never emitted as
-a concrete entity. A concrete node references it via `extends:` to inherit its
-children + attrs. This is the lightest reuse mechanism — pure data, no codegen
-change.
-
-```yaml
-- object.entity:
-    name: BaseEntity
-    abstract: true
-    children:
-      - field.long: { name: id }
-      - field.timestamp: { name: createdAt, required: true }
-
-- object.entity:
-    name: Author
-    extends: BaseEntity
-    children:
-      - source.rdb: { table: authors }
-      - field.string: { name: name, required: true }
-      - identity.primary: { name: id, fields: id }
-```
-
-Resolution facts:
-
-- **Deferred.** `extends:` resolves *after all files load* — abstracts can live in
-  any file, forward references are fine.
-- **Multi-level chains resolve through the whole chain** (`Author extends BaseEntity
-  extends Auditable`) — each `extends` is a super-*reference*, so resolution walks the
-  full chain (it does not flatten inherited members onto the child; see ADR-0039).
-- **Cross-package** refs use the fully-qualified name (`extends: "shared::auditable"`);
-  same-package refs use the bare name.
-- An unresolved reference fails with `ERR_UNRESOLVED_SUPER`.
-
-`abstract` and `extends` are **structural keys** (bare, no `@`).
-
-**Inherited properties live on the parent** (`extends` is a super-reference, not a flatten).
-A generator or provider must read through the resolving accessors, never `own*()` (ADR-0039;
-the `metaobjects-codegen` skill has the per-port table).
-
-**`overlay` is a different concept.** `extends:` is an IS-A relationship between
-two distinct nodes. `overlay: true` re-opens the *same* named node to amend it
-across files (same `package` + same `name` → merged; last-writer-wins on attr
-conflicts, structural children accumulate). Use `extends` to share shape between
-distinct entities; use `overlay` to split one entity's declaration across files.
-
-**Building on a dependency's metadata** (`dependencies` in `.metaobjects/config.json`):
-its nodes load before yours, so `extends` and `overlay: true` work across the boundary. Always
-say `overlay: true` on an amendment to a node you do not own. The rules are in
-`references/metadata-dependencies.md`.
-
 ## Discriminator inheritance (TPH)
 
 Several variants of one thing sharing **one table**: the base `object.entity` declares
@@ -679,7 +452,7 @@ immutable. Supported in all five ports; the worked example is in `references/inh
 
 ## Requirements — capability ledger (opt-in)
 
-**This capability exists whether or not the project uses it yet.** `requirement.functional` and `requirement.architectural` are registered metadata types, declared in `metaobjects/` beside the entities they describe and loaded by the same loader — no side file, no bespoke parser. They record *why* each part of the model exists, so a field with no reason to exist becomes visible as one.
+**This capability exists whether or not the project uses it yet.** `requirement.functional` and `requirement.architectural` are registered metadata types, declared in the metadata directory beside the entities they describe and loaded by the same loader — no side file, no bespoke parser. They record *why* each part of the model exists, so a field with no reason to exist becomes visible as one.
 
 Reach for it when the project needs to answer any of:
 

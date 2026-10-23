@@ -18,3 +18,45 @@ export const ProbeStateInsertSchema = z.object({
   sweepCount: z.number().int(),
   alerted: z.boolean(),
 });
+/**
+ * Metadata constants for the value object ProbeState: each field's name, label, view and the
+ * validation rules derived from its validator children (e.g. `ProbeState.<field>.rules.maxLength.value`).
+ */
+export const ProbeState = {
+  $entity: "ProbeState",
+  probe: {
+    name: "probe",
+    label: "Probe",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Probe is required" },
+  },
+  verdict: {
+    name: "verdict",
+    label: "Verdict",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Verdict is required" },
+  },
+  since: {
+    name: "since",
+    label: "Since",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Since is required" },
+  },
+  sweepCount: {
+    name: "sweepCount",
+    label: "Sweep Count",
+    view: "number",
+    htmlType: "number",
+    rules: { required: "Sweep Count is required" },
+  },
+  alerted: {
+    name: "alerted",
+    label: "Alerted",
+    view: "checkbox",
+    htmlType: "checkbox",
+    rules: { required: "Alerted is required" },
+  },
+} as const;

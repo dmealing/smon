@@ -5,7 +5,7 @@ name: CI
 #   1. `bun run gen` + assert no diff — regenerates src/generated/* and docs/generated/*
 #      from metaobjects/*.json and fails if the committed output doesn't match. It is the
 #      gate that proves the COMMITTED output is what the metadata currently produces.
-#   2. `bun run verify` — the metaobjects drift gates. Three subverbs run, and each answers
+#   2. `bun run verify` — the metaobjects drift gates. Three checks run, and each answers
 #      a question step 1 does not:
 #        --templates  every template BODY still resolves against its payload. Since
 #                     MetaObjects 1.0 this covers `template.output @kind=email` bodies,
@@ -21,9 +21,9 @@ name: CI
 #                     .metaobjects/.gen-state/.hashes.json (committed for exactly this
 #                     reason) so it can also tell a hand-edited generated file, and an
 #                     orphan we wrote but no longer emit, from a clean tree.
-#        --docs       the committed docs/*.md + docs/api/*.md still match a fresh
-#                     `meta docs`. Scoped to the pages `meta docs` owns — it correctly
-#                     leaves docs/generated/monitoring.md (a `meta gen` artifact) alone.
+#                     Since 1.1.0 documentation is a generator in metaobjects.config.ts, so
+#                     --codegen also covers docs/*.md, docs/api/*.md and
+#                     docs/generated/monitoring.md (`meta verify --docs` was removed).
 #   3. `bun test` — the full unit/behavior suite (parser, runner, policy, notify adapters,
 #      enrichment, parity-oracle cases) INCLUDING test/drift.test.ts, which proves the two
 #      gates above actually bite by mutating a throwaway copy of this repo four ways.
@@ -65,7 +65,7 @@ jobs:
       - name: Assert generated output matches metadata (no diff)
         run: git diff --exit-code
 
-      - name: meta verify (templates + codegen + docs drift gates)
+      - name: meta verify (templates + codegen drift gates)
         run: bun run verify
 
       - name: Test

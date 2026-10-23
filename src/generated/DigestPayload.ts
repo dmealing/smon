@@ -29,3 +29,73 @@ export const DigestPayloadInsertSchema = z.object({
   probes: z.array(ProbeStateInsertSchema),
   transitions24h: z.array(TransitionInsertSchema),
 });
+/**
+ * Metadata constants for the value object DigestPayload: each field's name, label, view and the
+ * validation rules derived from its validator children (e.g. `DigestPayload.<field>.rules.maxLength.value`).
+ */
+export const DigestPayload = {
+  $entity: "DigestPayload",
+  host: {
+    name: "host",
+    label: "Host",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Host is required" },
+  },
+  date: {
+    name: "date",
+    label: "Date",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Date is required" },
+  },
+  worstStatus: {
+    name: "worstStatus",
+    label: "Worst Status",
+    view: "dropdown",
+    rules: { required: "Worst Status is required" },
+    options: ["OK", "WARN", "FAIL"] as const,
+  },
+  allOk: {
+    name: "allOk",
+    label: "All Ok",
+    view: "checkbox",
+    htmlType: "checkbox",
+    rules: { required: "All Ok is required" },
+  },
+  okCount: {
+    name: "okCount",
+    label: "Ok Count",
+    view: "number",
+    htmlType: "number",
+    rules: { required: "Ok Count is required" },
+  },
+  warnCount: {
+    name: "warnCount",
+    label: "Warn Count",
+    view: "number",
+    htmlType: "number",
+    rules: { required: "Warn Count is required" },
+  },
+  failCount: {
+    name: "failCount",
+    label: "Fail Count",
+    view: "number",
+    htmlType: "number",
+    rules: { required: "Fail Count is required" },
+  },
+  probes: {
+    name: "probes",
+    label: "Probes",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Probes is required" },
+  },
+  transitions24h: {
+    name: "transitions24h",
+    label: "Transitions24h",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Transitions24h is required" },
+  },
+} as const;

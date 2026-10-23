@@ -11,13 +11,18 @@ MongoDB 7 with the `mongodb` 7.x Node driver: create, list by an enum value and 
 and delete work; a filter on an undeclared field is refused; a create with a value outside the
 enum fails Zod validation.
 
+## Contents
+- Use it
+- The generator
+
 ## Use it
 
 1. Save the file below as `codegen/generators/mongo-repository.ts` — it is yours to edit.
-2. `npx meta eject entity`, then wire both generators:
+2. Wire it next to the stock entity generator, imported from its package and run as
+   shipped:
 
    ```ts
-   import { entityFile } from "./codegen/generators/entity.js";
+   import { entityFile } from "@metaobjectsdev/codegen-ts/generators";
    import { mongoRepositoryGenerator } from "./codegen/generators/mongo-repository.js";
 
    export default defineConfig({
@@ -26,7 +31,9 @@ enum fails Zod validation.
    });
    ```
 
-3. `npm install mongodb`, then `npx meta gen`. Use the repository from your routes:
+3. `npm install mongodb` and the packages the `entity` row of
+   `npx meta gen --list --format json` lists under `install` (the text listing does not
+   print them), then `npx meta gen`. Use the repository from your routes:
    `const orders = orderRepository(client.db("shop")); await orders.create(body);`
 
 What the repository does, built on the generated contract:

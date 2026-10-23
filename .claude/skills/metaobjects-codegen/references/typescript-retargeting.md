@@ -7,6 +7,13 @@ This is the TypeScript implementation of the retargeting doctrine in
 everything below — `meta eject`, `metaobjects.config.ts` keys, the exported
 `render*` functions — is Node-CLI-specific and exists only on this port.
 
+## Contents
+- Check the target-shaped config first
+- Ask whether your framework splits the module graph
+- If the emit is wrong for your framework, own the generator
+- `"use client"` needs no ejecting at all — it is a config knob
+- Server-tier output is usually already portable
+
 The shipped reference templates emit for **Fastify on Node** (plus a Hono variant) with
 Drizzle and Zod. If that is not your stack, retargeting is the **normal first move** — not
 a workaround and not a sign of a bug. Each template's header carries a `targets:` line

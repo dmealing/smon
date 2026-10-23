@@ -10,6 +10,14 @@ generators cover some stacks. Every other stack is reached the same way: keep th
 source of truth, generate what is built in, and write or retarget a generator for the rest.
 Nothing below needs a new MetaObjects release, a new metamodel attribute, or permission.
 
+## Contents
+- Find out what is built in — do not guess
+- Split the app into layers and decide each one
+- Persistence
+- An HTTP framework that is not built in
+- A UI framework that is not built in
+- Prove it works
+
 ## 1. Find out what is built in — do not guess
 
 ```bash
@@ -30,8 +38,10 @@ reference generators target React and TanStack. Anything else is this page.
 | **api** — the HTTP surface | Fastify, Hono | §4 |
 | **client** — hooks, forms, grids | React, TanStack | §5 |
 
-The model layer never depends on the store or the framework. Generate it first
-(`meta eject entity`, wire `entityFile()`); everything you write later imports it.
+The model layer never depends on the store or the framework. Generate it first: import
+`entityFile` from `@metaobjectsdev/codegen-ts/generators` and wire `entityFile()`. Nothing
+is copied, and everything you write later imports its output. Eject it (`meta eject
+entity`) only if you need to change what it emits.
 
 ## 3. Persistence
 

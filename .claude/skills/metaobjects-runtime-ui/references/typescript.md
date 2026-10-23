@@ -4,6 +4,16 @@ The Node-side runtime tier is `@metaobjectsdev/runtime-ts`. It supplies both the
 helpers the generated routes lean on (`parseFilterParams`) and a metadata-driven
 `ObjectManager` for full-runtime CRUD / validation / relationship traversal.
 
+## Contents
+- Two ways to persist
+- Drivers
+- Physical names: the column object first, `<Entity>Names` where there is none
+- Getting the name INTO a query is a per-driver question
+- Return-type contract
+- Serving the REST contract
+- Granular routes — mount some, hand-write the rest (don't read `node_modules`)
+- Generated routes are unauthenticated — guard them or don't mount them
+
 ## Two ways to persist
 
 **1. Generated query helpers (the common path).** `queriesFile()` emits a
