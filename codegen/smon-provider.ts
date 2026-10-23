@@ -43,6 +43,7 @@ import {
   ATTR_SUBTYPE_STRING,
   CHILD_RULE_WILDCARD,
   TypeId,
+  stripPackage,
 } from "@metaobjectsdev/metadata";
 
 const TYPE_ADAPTER = "adapter";
@@ -211,7 +212,7 @@ export const smonMonitorTypes: MetaDataTypeProvider = {
           }
           const wantPayload = node.attr(payloadAttr);
           const gotPayload = target.attr("payloadRef");
-          if (typeof wantPayload === "string" && wantPayload !== "" && gotPayload !== wantPayload) {
+          if (typeof wantPayload === "string" && wantPayload !== "" && (typeof gotPayload !== "string" || stripPackage(gotPayload) !== stripPackage(wantPayload))) {
             ctx.error(
               "ERR_SMON_TEMPLATE_PAYLOAD_MISMATCH",
               node,

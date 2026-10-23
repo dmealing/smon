@@ -9,11 +9,11 @@ Generated from `metaobjects/meta.notify.json` by `codegen/generators/monitor-doc
 
 | Adapter | Kind | Payloads | Required config | Templates |
 |---|---|---|---|---|
-| Email | email | smon::AlertPayload / DigestPayload | `SMON_EMAIL_TO` | AlertEmail, DigestEmail |
-| HaPush | push | smon::AlertPayload / DigestPayload | `SMON_HA_URL`, `SMON_HA_TOKEN`, `SMON_HA_DEVICE` | - |
-| Kuma | heartbeat | smon::HeartbeatPayload | `SMON_KUMA_PUSH_URL` | - |
-| Matrix | chat | smon::AlertPayload / DigestPayload | `SMON_MATRIX_HOMESERVER`, `SMON_MATRIX_TOKEN`, `SMON_MATRIX_ROOM` | - |
-| Stdout | stdout | smon::AlertPayload / DigestPayload | - | - |
+| Email | email | AlertPayload / DigestPayload | `SMON_EMAIL_TO` | AlertEmail, DigestEmail |
+| HaPush | push | AlertPayload / DigestPayload | `SMON_HA_URL`, `SMON_HA_TOKEN`, `SMON_HA_DEVICE` | - |
+| Kuma | heartbeat | HeartbeatPayload | `SMON_KUMA_PUSH_URL` | - |
+| Matrix | chat | AlertPayload / DigestPayload | `SMON_MATRIX_HOMESERVER`, `SMON_MATRIX_TOKEN`, `SMON_MATRIX_ROOM` | - |
+| Stdout | stdout | AlertPayload / DigestPayload | - | - |
 
 ## Probes
 

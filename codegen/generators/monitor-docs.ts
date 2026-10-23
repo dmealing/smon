@@ -12,7 +12,7 @@
 // / @configKeys are rendered — never a resolved value. The model itself never
 // carries host data (see codegen/smon-provider.ts), so this can't leak any.
 
-import type { MetaData } from "@metaobjectsdev/metadata";
+import { stripPackage, type MetaData } from "@metaobjectsdev/metadata";
 import { GENERATED_HEADER, GENERATED_EDIT_NOTE, type Generator } from "@metaobjectsdev/codegen-ts/engine";
 
 const TYPE_ADAPTER = "adapter";
@@ -44,8 +44,9 @@ function renderAdaptersTable(adapters: readonly MetaData[]): string {
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((a) => {
       const kind = stringAttr(a, "kind") ?? "";
-      const payloadRef = stringAttr(a, "payloadRef") ?? "";
-      const digestPayloadRef = stringAttr(a, "digestPayloadRef");
+      const payloadRef = stripPackage(stringAttr(a, "payloadRef") ?? "");
+      const digestPayloadRefRaw = stringAttr(a, "digestPayloadRef");
+      const digestPayloadRef = digestPayloadRefRaw && stripPackage(digestPayloadRefRaw);
       const payloads = digestPayloadRef ? `${payloadRef} / ${digestPayloadRef}` : payloadRef;
       const requiredConfig = codeList(stringArrayAttr(a, "requiredConfig"));
       const alertTemplateRef = stringAttr(a, "alertTemplateRef");

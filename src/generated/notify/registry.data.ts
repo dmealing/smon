@@ -17,27 +17,27 @@ export interface NotifyAdapter<A, D = never> {
 export const ADAPTERS = {
   email: {
     kind: "email",
-    payloadRef: "smon::AlertPayload",
+    payloadRef: "AlertPayload",
     digestPayloadRef: "DigestPayload",
     requiredConfig: ["SMON_EMAIL_TO"],
     optionalConfig: ["SMON_SMTP_CMD"],
   },
   "ha-push": {
     kind: "push",
-    payloadRef: "smon::AlertPayload",
+    payloadRef: "AlertPayload",
     digestPayloadRef: "DigestPayload",
     requiredConfig: ["SMON_HA_URL", "SMON_HA_TOKEN", "SMON_HA_DEVICE"],
     optionalConfig: [],
   },
   kuma: {
     kind: "heartbeat",
-    payloadRef: "smon::HeartbeatPayload",
+    payloadRef: "HeartbeatPayload",
     requiredConfig: ["SMON_KUMA_PUSH_URL"],
     optionalConfig: [],
   },
   matrix: {
     kind: "chat",
-    payloadRef: "smon::AlertPayload",
+    payloadRef: "AlertPayload",
     digestPayloadRef: "DigestPayload",
     requiredConfig: [
       "SMON_MATRIX_HOMESERVER",
@@ -48,7 +48,7 @@ export const ADAPTERS = {
   },
   stdout: {
     kind: "stdout",
-    payloadRef: "smon::AlertPayload",
+    payloadRef: "AlertPayload",
     digestPayloadRef: "DigestPayload",
     requiredConfig: [],
     optionalConfig: [],

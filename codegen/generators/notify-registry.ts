@@ -26,7 +26,7 @@
 // `impl: theImpl satisfies NotifyAdapter<...>` per entry. Nothing produced
 // here is a stub Task 9 must delete.
 
-import type { MetaData } from "@metaobjectsdev/metadata";
+import { stripPackage, type MetaData } from "@metaobjectsdev/metadata";
 import { formatTs, GENERATED_HEADER, GENERATED_EDIT_NOTE, type Generator } from "@metaobjectsdev/codegen-ts";
 
 const TYPE_ADAPTER = "adapter";
@@ -56,11 +56,13 @@ function renderAdapterEntry(node: MetaData): string {
   if (kind === undefined) {
     throw new Error(`notify-registry: adapter.notify "${node.name}" is missing required @kind.`);
   }
-  const payloadRef = stringAttr(node, "payloadRef");
+  const payloadRefRaw = stringAttr(node, "payloadRef");
+  const payloadRef = payloadRefRaw === undefined ? undefined : stripPackage(payloadRefRaw);
   if (payloadRef === undefined) {
     throw new Error(`notify-registry: adapter.notify "${node.name}" is missing required @payloadRef.`);
   }
-  const digestPayloadRef = stringAttr(node, "digestPayloadRef");
+  const digestPayloadRefRaw = stringAttr(node, "digestPayloadRef");
+  const digestPayloadRef = digestPayloadRefRaw === undefined ? undefined : stripPackage(digestPayloadRefRaw);
   const requiredConfig = stringArrayAttr(node, "requiredConfig");
   const optionalConfig = stringArrayAttr(node, "optionalConfig");
 
