@@ -54,20 +54,17 @@ path is `TemplateScopeGenerator`, wired the same way with `<template>` / `<scope
 covers Java and Kotlin alike. No `--template-spec` flag here either, for the same reason:
 `<generator>` already loads a consumer class from the project classpath.
 
-**C# and Python** have both. Programmatic: on C#, an `IGenerator` listed in the owned
-`codegen/Program.cs` (which `dotnet meta gen` / `verify --codegen` hand off to); on Python,
-a `module:symbol` entry in `--generators` or in `metaobjects.config.yaml`. (Python's
+**C# and Python** have both. Programmatic: on C#, an `IGenerator` listed in
+`codegen/Generators.cs` (the list `dotnet meta gen` / `verify --codegen` run); on Python,
+a `module:symbol` entry in a target's `generators` in `metaobjects.config.yaml`. (Python's
 `--provider module:symbol` registers **metamodel vocabulary**, not a generator.)
-Declarative: `--template-spec <json>` — plus `--templates <dir>` on Python or
-`--template-root <dir>` on C# — and your entries are appended to your `--generators`
-selection. Worked examples with the full JSON: `docs/ports/python.md` and
-`docs/ports/csharp.md`.
-
-**The spec is auto-discovered, and that is load-bearing.** With no `--template-spec`, both
-ports read `<projectRoot>/template-spec.json` — projectRoot being the metadata dir's parent.
-Keep it there: `verify --codegen` accepts no `--template-spec` flag, so the conventional path
-is how the drift gate learns your template generators exist. Put the spec somewhere else and
-reach it only by flag, and `verify` regenerates without it and reports its output as stale.
+Declarative: a JSON template-spec. On Python it is declared on a target
+(`templateSpec: <json>`, refs resolved under `--templates <dir>`) and runs into that target's
+`outDir`. On C# it is an entry in `codegen/Generators.cs`:
+`new MetaObjects.Codegen.TemplateCodegen.TemplateSpecGenerator { Spec = "template-spec.json",
+TemplateRoot = "templates" }`. Neither port reads a spec it was not given there: a leftover
+project-root `template-spec.json` with nothing declaring a spec fails the run. Worked examples
+with the full JSON: `docs/ports/python.md` and `docs/ports/csharp.md`.
 
 So on every port, "I need a shape the built-ins do not emit" is answered by a generator of
 your own or a template. Do not conclude the port cannot be customized.

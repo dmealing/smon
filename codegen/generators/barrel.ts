@@ -28,7 +28,7 @@ import {
   GENERATED_HEADER,
   GENERATED_EDIT_NOTE,
   effectivePackage,
-} from "@metaobjectsdev/codegen-ts";
+} from "@metaobjectsdev/codegen-ts/engine";
 
 interface BarrelEntry {
   name: string;

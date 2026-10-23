@@ -22,3 +22,51 @@ export const AlertPayloadInsertSchema = z.object({
   enrichedBody: z.string().min(1),
   fromTag: z.string().optional(),
 });
+/**
+ * Metadata constants for the value object AlertPayload: each field's name, label, view and the
+ * validation rules derived from its validator children (e.g. `AlertPayload.<field>.rules.maxLength.value`).
+ */
+export const AlertPayload = {
+  $entity: "AlertPayload",
+  host: {
+    name: "host",
+    label: "Host",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Host is required" },
+  },
+  probe: {
+    name: "probe",
+    label: "Probe",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Probe is required" },
+  },
+  verdict: {
+    name: "verdict",
+    label: "Verdict",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Verdict is required" },
+  },
+  kind: {
+    name: "kind",
+    label: "Kind",
+    view: "dropdown",
+    rules: { required: "Kind is required" },
+    options: ["fail", "warn", "recovery"] as const,
+  },
+  enrichedBody: {
+    name: "enrichedBody",
+    label: "Enriched Body",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Enriched Body is required" },
+  },
+  fromTag: {
+    name: "fromTag",
+    label: "From Tag",
+    view: "text",
+    htmlType: "text",
+  },
+} as const;

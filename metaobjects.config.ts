@@ -15,7 +15,7 @@ import { barrel } from "./codegen/generators/barrel";
 //     artifact appears by itself the day an object gains a source.rdb, rather than being
 //     the thing nobody remembers to add. (Since 1.0.x `meta gen` reports it on every run
 //     as "1 wired generator(s) matched nothing and wrote no file: names" — expected here.)
-import { promptRender, renderHelper, namesFile } from "@metaobjectsdev/codegen-ts/generators";
+import { promptRender, renderHelper, namesFile, docsFile, apiDocsFile } from "@metaobjectsdev/codegen-ts/generators";
 // smon's own metamodel vocabulary (Task 5) — adapter.notify + probe.bash.
 import { smonMonitorTypes } from "./codegen/smon-provider";
 // smon's own codegen (Task 7) — walks adapter.notify / probe.bash nodes and
@@ -45,15 +45,14 @@ export default defineConfig({
     notifyRegistry(),
     probeRoster(),
     monitorDocs(),
+    docsFile(),
+    apiDocsFile(),
   ],
-  docs: {
-    outDir:   "./docs",        // every surface lands here (run: bun run docs)
-    layout:   "flat",          // or "package" for multi-package models
-    // "agent" is the 1.0 surface .metaobjects/AGENTS.md tells a reader to consult before
-    // touching a tier. It currently emits NOTHING for smon — its three pages describe a
-    // physical schema, a generated UI and a requirement ledger, and smon has none of the
-    // three, so by the surface's own "an empty page is no file" rule no agent/ directory
-    // appears. Declared so it starts working on its own if that ever changes.
-    surfaces: ["model", "api", "agent"],
+  // Documentation is a generator now (1.1.0): the model pages and the api reference are
+  // entries in `generators`, written to the target named `docs`. The 1.0 "agent" surface
+  // emitted nothing for smon (no physical schema, UI or requirement ledger), so it is not
+  // listed; add agentDocsFile() / requirementsFile() if that changes.
+  targets: {
+    docs: { outDir: "./docs", outputLayout: "flat" },
   },
 });

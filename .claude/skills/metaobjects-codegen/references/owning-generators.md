@@ -2,6 +2,13 @@
 
 > Part of the `metaobjects-codegen` skill. Read it when generated output is wrong, when your framework is not the one a reference emits for, or when you write or review a generator (the `own*()` accessor table is here).
 
+## Contents
+- A defect in generated code is a defect in your generator
+- Run it as shipped, or own a copy
+- A generator of your own beside the references
+- Your framework isn't the default — the retargeting procedure
+- Never read metadata through an `own*()` accessor (ADR-0039) — top bug source
+
 ## A defect in generated code is a defect in your generator
 
 When generated output does not compile, has the wrong shape, or collides with code you
@@ -10,9 +17,9 @@ it there, in the same change, and keep going:
 
 | Port | Where the fix goes |
 |---|---|
-| **TypeScript** | Your ejected copy under `codegen/generators/` — and, for routes, the HTTP adapter it calls: `meta eject routes` / `routes-hono` / `entity` also copy that adapter's source (mount helpers, filter parser, error envelopes, pagination) into `codegen/runtime/`, and the ejected output imports it from there, so a bug in a route's behaviour is fixed in that copy. If you are running a generator you never ejected, `meta eject <name>` it first. A generator that `meta eject --list` does not name (the prompt tier, for one) has no reference template yet: replace it in `generators` with your own `Generator`, starting from its source in the installed package. |
+| **TypeScript** | Your ejected copy under `codegen/generators/` — and, for routes, the HTTP adapter it calls: `meta eject routes` / `routes-hono` / `entity` also copy that adapter's source (mount helpers, filter parser, error envelopes, pagination) into `codegen/runtime/`, and the ejected output imports it from there, so a bug in a route's behaviour is fixed in that copy. If you are running a generator you never ejected (imported from its package), `meta eject <name>` it first and swap the import for the local one eject prints. Every stock generator can be ejected except the `template` primitive, which has no emit logic of its own to own, and `docs-site`, whose builder stays in the package (`meta eject docs-site` copies the site's templates and assets into `codegen/docs-site/`); an ejected generator comes with the template modules that write its output (`codegen/templates/`): the text of what it emits is yours to change too. An ejected `docs` or `api-docs` goes in `generators`, like any other owned copy — there is no separate docs list, and `meta gen` runs it. A generator `meta gen --list` marks `package-only` has no reference template: replace it in `generators` with your own `Generator`, starting from its source in the installed package. |
 | **Java / Kotlin** | Your own generator class. Subclass the reference generator and override the `protected` method that emits the wrong piece; when that piece is `private`, copy the reference generator's source (Apache-2.0) into your own package and edit it. Put the class in a codegen module that the module running `metaobjects:generate` depends on — the plugin loads `<classname>` from that module's compile classpath, and `provided` scope keeps it out of your packaged app — then point `<classname>` at it. Full steps: the Java and Kotlin references. |
-| **C# / Python** | Your owned copy (`dotnet meta eject <name>` / `metaobjects eject <name>`, then edit it), or a generator of your own that replaces the artifact — an `IGenerator` in `codegen/Program.cs` on C#, a `module:symbol` entry on Python — or a template spec (`--template-spec`). |
+| **C# / Python** | Your owned copy (`dotnet meta eject <name>` / `metaobjects eject <name>`, then edit it), or a generator of your own that replaces the artifact — an `IGenerator` in `codegen/Generators.cs` on C#, a `module:symbol` entry in a target's `generators` on Python — or a template spec. |
 
 Then do **not**:
 
@@ -42,6 +49,26 @@ Every port gets a reference generator's source the same way — its `eject` comm
 writes a new one against the same small interface (the top of the skill). Your language
 reference has the per-port mechanics.
 
+## Run it as shipped, or own a copy
+
+Owning a generator is how you **change** it. It is not a precondition for running one, and
+a copy you never change is a cost: it duplicates the reference and falls behind it, so the
+project misses fixes it would have received by upgrading.
+
+| You want | Do |
+|---|---|
+| A stock generator's output, unchanged | Wire it from its package and copy nothing. TypeScript: the import line on its `meta gen --list` row, for example `import { entityFile } from "@metaobjectsdev/codegen-ts/generators";`. Other ports: select it by its stable name. |
+| To change what a stock generator emits | Eject it, edit the copy, and point the config at the copy. On TypeScript the factory keeps its name, so that is one import line. |
+| To stop carrying a copy you never changed | Each port's listing marks every owned copy identical to the reference or differing from it: `meta eject --list --format text` (TypeScript), `metaobjects gen --list` (Python), `dotnet meta gen --list` (C#), `mvn metaobjects:eject -Dlist` (Java, Kotlin). On TypeScript, only a copy marked identical is proven unmodified: there the mark means byte-for-byte equal. On Python, C# and Java/Kotlin, identical compares lines without regard to their order, so it rules out added, edited and removed lines but not reordered ones: confirm from the file's history (`git log -p` on the copy shows no edit after the eject) before dropping it. On every port, one marked as the same content in your formatting, or as differing with no lines of your own, may still carry lines you removed or reordered, because that count rules out added or edited lines only: confirm from the file's history (`git log -p` on the copy shows no edit after the eject) before dropping it. On TypeScript, replace its local import with the package import, delete the file, run `meta gen` and review the diff. `entity`, `routes` and `routes-hono` also own the HTTP adapter under `codegen/runtime/`: treat one as unmodified only when the generator file and every runtime file it reaches are marked identical. The runtime rows are printed by `meta eject --list --format text`, and carried as the `runtimeCopy` array (a `verdict` per file) inside the `source` object of the generator's row in `meta gen --list --format json`. Away from a terminal, `meta eject --list` without `--format text` prints generator rows only, and a listing with no runtime rows is not evidence that the adapter is unmodified. If a runtime file differs, your change lives there, so keep the owned generator, which is what points the output at that adapter. |
+
+A generator you import is still a reference helper: its output can change when you upgrade,
+and `verify --codegen` reports that as drift until you regenerate. If output has to hold
+still across upgrades, own the copy.
+
+On TypeScript `@metaobjectsdev/*` 1.0.x, `entityFile`, `queriesFile`, `routesFile` and
+`barrel` are not exported from the package and an owned copy is the only way to run them.
+1.1 restored the import. Check the installed version before replacing a copy with it.
+
 ## A generator of your own beside the references
 
 Real apps routinely need output no reference emits as-is — a bespoke REST contract, custom
@@ -51,6 +78,22 @@ answer is the top of the skill: **write the generator**, in the same
 same target rules, and is drift-gated the same way. The runner adds no header to its output;
 on TypeScript, C# and Python none is needed, because the hash manifest records what was
 written.
+
+**Is it worth a generator? Run the cost test first.** Write an adopter-owned generator only
+when at least one holds:
+
+1. **It is smaller.** The generator code plus its generated output, plus the metadata it
+   adds, is fewer lines than the hand-written code it replaces.
+2. **More instances are coming.** The app will keep adding entities, routes or events of this
+   shape, so the generator's cost is paid back as the model grows.
+3. **Drift protection is the point.** A change to the model could pass the compiler and go
+   wrong silently (a runtime lookup by name, a string a consumer compares), and regeneration
+   plus `verify` is what catches it.
+
+Otherwise hand-write it: a one-off layer that reads typed generated properties cannot drift
+and is a fine place to stop. A generator with a general shape (usable by any app on this
+model) belongs in the MetaObjects library, not copied into each app; that is an upstream
+request, not a reason to grow your own.
 
 Write a new generator when the *shape* needs to change. When a reference's shape is right
 and only its *target* is wrong — a different framework than the reference emits for — eject
@@ -125,10 +168,10 @@ convention, not the method name.
 a normal source file. Copy it and customize the copy (three-way merge preserves your
 edits on regen), or customize the template a built-in renders from. Reach for a
 custom generator when you want the change applied **consistently across every
-entity** (the scale win); a one-off edit when it's genuinely one file.
+entity** and it passes the cost test above; a one-off edit when it's genuinely one file.
 
 **The decision ladder:** an output the model describes that no reference emits → write
-a generator (the top of the skill) · a reference is close → eject it and customize the
+a generator if it passes the cost test (the top of the skill) · a reference is close → eject it and customize the
 copy · a reference fits → use it · only the genuinely un-modelable (business algorithms,
 external calls) is hand-written outside codegen — and it still imports the generated
 types.

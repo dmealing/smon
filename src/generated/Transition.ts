@@ -19,3 +19,45 @@ export const TransitionInsertSchema = z.object({
   toKey: z.string().min(1),
   kind: z.enum(["fail", "warn", "recovery"]),
 });
+/**
+ * Metadata constants for the value object Transition: each field's name, label, view and the
+ * validation rules derived from its validator children (e.g. `Transition.<field>.rules.maxLength.value`).
+ */
+export const Transition = {
+  $entity: "Transition",
+  time: {
+    name: "time",
+    label: "Time",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Time is required" },
+  },
+  probe: {
+    name: "probe",
+    label: "Probe",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Probe is required" },
+  },
+  fromKey: {
+    name: "fromKey",
+    label: "From Key",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "From Key is required" },
+  },
+  toKey: {
+    name: "toKey",
+    label: "To Key",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "To Key is required" },
+  },
+  kind: {
+    name: "kind",
+    label: "Kind",
+    view: "dropdown",
+    rules: { required: "Kind is required" },
+    options: ["fail", "warn", "recovery"] as const,
+  },
+} as const;

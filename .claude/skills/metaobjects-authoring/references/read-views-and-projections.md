@@ -2,6 +2,10 @@
 
 > Part of the `metaobjects-authoring` skill. The skill covers the entity read-view, which is the right answer for most grids. Read this when you need an independent exposure (`object.projection`), the `origin.*` vocabulary, `@filter` / `@expr` shapes, or an `@sql` / `@unmanaged` view.
 
+## Contents
+- Read-view or projection?
+- Projections
+
 ## Read-view or projection?
 
 **Reach for a projection only when one of these is true** (from

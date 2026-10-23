@@ -93,7 +93,7 @@ describe("drift gate — the model is self-defending", () => {
       expect(gen.code).toBe(0);
       // The full gate set CI runs, not just the default subverb — otherwise this sanity
       // check can pass while the gates CI actually runs are red on a clean tree.
-      const verify = runMeta(tmp, ["verify", "--templates", "--codegen", "--docs", "--prompts", "templates"]);
+      const verify = runMeta(tmp, ["verify", "--templates", "--codegen", "--prompts", "templates"]);
       expect(verify.output).toContain("all clean");
       expect(verify.code).toBe(0);
     },

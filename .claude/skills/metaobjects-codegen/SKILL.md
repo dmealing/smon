@@ -1,6 +1,6 @@
 ---
 name: metaobjects-codegen
-description: Use when you need ANY output derived from the MetaObjects model — write your own generator (OpenAPI, JSON Schema, Zod, DTOs, a client, docs, anything) or eject a reference one — and when configuring or running code generation, generators/targets/dialect config, the gen command, and hand-edit-preserving regeneration.
+description: Use when you need ANY output derived from the MetaObjects model — write your own generator (OpenAPI, JSON Schema, Zod, DTOs, a client, docs, anything) or eject a reference one — and when configuring or running code generation: editing the gen config (metaobjects.config.ts) to choose generators, targets or the SQL dialect (e.g. postgres to sqlite), the gen command, and hand-edit-preserving regeneration.
 ---
 
 # MetaObjects code generation
@@ -16,8 +16,9 @@ replace — if the libraries disappeared tomorrow, you keep working code.
 **MetaObjects is the core; the generators are yours** (ADR-0034 Amendments 3 and 4). The
 core — model, loader, registry, `verify`, `migrate`, prompt render and reply extract — is
 what MetaObjects guarantees. On it, you build the generators the application needs. The
-generators MetaObjects ships are reference examples: copy one with `eject` when it is
-close to what you need, and write your own when it is not. When a generated file is
+generators MetaObjects ships are reference helpers: run one as shipped when it already
+emits what you want, copy it with `eject` when it is close and you need to change it, and
+write your own when nothing fits. When a generated file is
 wrong, fix the generator that emitted it — do not hand-edit around it, and do not treat it
 as a broken core guarantee.
 
@@ -27,7 +28,8 @@ and command for *this* project's server language live in a reference fragment
 
 ## Reference files — open only the one your task needs
 
-Your server language's file (`references/typescript.md`, `references/java.md`, …) has the
+Your server language's file (`references/typescript.md`, `references/java.md`,
+`references/kotlin.md`, `references/csharp.md` or `references/python.md`) has the
 exact config, generator names and commands for this project; read it. The other files in
 `references/` are topics — open one when its row matches what you are doing.
 
@@ -39,6 +41,33 @@ exact config, generator names and commands for this project; read it. The other 
 | `references/template-or-code.md` | choosing between a code generator and a Mustache template |
 | `references/physical-names.md` | before you write a table, column or index name as a string |
 | `references/dependencies-and-shared-models.md` | the project consumes or publishes metadata across projects |
+| `references/typescript-document-store.md` | a TypeScript project on MongoDB, or any store MetaObjects does not manage, wanting a tested repository generator |
+| `references/typescript-mysql.md` | a TypeScript project on a MySQL database |
+| `references/typescript-retargeting.md` | a TypeScript project on a framework other than Fastify, Hono or React |
+| `references/typescript-templates.md` | declarative Mustache template-codegen in a TypeScript project |
+| `references/typescript-docs.md` | the docs generators (`docsFile`, `apiDocsFile`, `agentDocsFile`, `requirementsFile`, `metamodelDocsFile`, `docsSiteFile`) in a TypeScript project |
+
+## Upgrading a project from 1.0 to 1.1
+
+Read the one upgrade guide, https://github.com/metaobjectsdev/metaobjects/blob/v1.1.0/docs/features/migrations/upgrading-1.0-to-1.1.md, before the first `gen`, for every
+port the project uses; the build can stay green while the result is wrong. It lists the steps
+in order and every change that needs action.
+
+- The default column and table names are now `snake_case` in every port (C#, Java, Kotlin's
+  runtime and Python defaulted to the field names). A database whose columns are named like
+  its fields needs `"naming": { "columns": "literal" }` in `.metaobjects/config.json`, or
+  regenerated code queries columns that do not exist. The per-port naming flags and generator
+  args are removed.
+- Documentation is a generator in the project's list, and the docs commands are removed. C#
+  and Python also need a generator list (`dotnet meta init`; `metaobjects.config.yaml`).
+- A `field.decimal` crosses the API as one canonical string, and a fractional validator `@min`
+  or `@max` is refused (write an integer bound).
+- **Resync the generators you own.** An ejected copy keeps the logic it was copied with, and a
+  plain `gen` does not refresh it. `meta eject --list` (TypeScript; `metaobjects gen --list` in Python, which has no
+  `eject --list`; `dotnet meta gen --list`; `mvn metaobjects:eject -Dlist=true` in Java and Kotlin)
+  reports each copy that differs from the reference;
+  `eject <name> --force` takes the new reference for a copy you never edited, and a copy you
+  edited is three-way merged instead. Steps for 1.0.x: https://github.com/metaobjectsdev/metaobjects/blob/v1.1.0/docs/features/migrations/upgrading-within-1.0.md.
 
 ## Need an output? Write the generator — this is the primary path
 
@@ -46,7 +75,9 @@ exact config, generator names and commands for this project; read it. The other 
 or none emits it the way this application needs it. OpenAPI, JSON Schema, Zod schemas,
 DTOs or a client for a framework nothing here ships, a service layer in the house style,
 a data dictionary, a search-index mapping, test fixtures. That is a generator, and you
-write it now, in this change. Do not hand-write the output (it drifts the day the model
+write it now, in this change — once it passes the cost test in `references/owning-generators.md`
+(smaller than the code it replaces, generator counted; more instances expected; or drift
+protection is the point). Do not hand-write the output (it drifts the day the model
 changes and nothing notices), do not wait for MetaObjects to ship it, and do not ask
 permission: a generator in this repo is ordinary source you own.
 
@@ -80,8 +111,8 @@ what it emits.
 | Port | Registration | Model helpers |
 |---|---|---|
 | TypeScript | import it in `metaobjects.config.ts`, add it to `generators: [...]` (the scaffold does both) | `@metaobjectsdev/codegen-ts`: `objectRefTarget`, `enumValues`, `effectivePackage`, `packageToPath`, `servedPath`, `toCamelCase`/`toPascalCase`/`toSnakeCase`/`pluralize`, `isAbstract`, `hasAnyRdbSource`, `servesReadApi`/`servesWriteApi` |
-| Python | a `module:symbol` entry in `--generators` or a target's `generators` in `metaobjects.config.yaml`; the symbol is an instance or a function returning one, never the class | `metaobjects.codegen.model_walk` |
-| C# | `new YourGenerator()` in the owned `codegen/Program.cs`; `dotnet meta gen` / `verify --codegen` hand off to `codegen/` whenever `codegen/Codegen.csproj` exists | node accessors, `ValueObjectNames.ResolveFieldRef`, `CSharpNaming.RoutePath` |
+| Python | a `module:symbol` entry in a target's `generators` in `metaobjects.config.yaml`; the symbol is an instance or a function returning one, never the class | `metaobjects.codegen.model_walk` |
+| C# | `new Codegen.Generators.YourGenerator()` in `codegen/Generators.cs` (`dotnet meta init` writes it); `dotnet meta gen` / `verify --codegen` run that list | node accessors, `ValueObjectNames.ResolveFieldRef`, `CSharpNaming.RoutePath` |
 | Java / Kotlin | `<generator><classname>` plus `<args><outputDir>`, from a module on the plugin's classpath; extend `FileEmittingGenerator` | `com.metaobjects.generator.ModelWalk` |
 
 **Verify it** — nothing to register. `verify --codegen` (`mvn metaobjects:verify` on the
@@ -110,10 +141,15 @@ without typechecking, so a wrong accessor runs silently.
 Every port's minimal generator (each run through gen, verify and a convicted model
 change) and two worked examples to copy — JSON Schema and OpenAPI 3.1, examples and not a
 product surface — are in the guide "Write your own generator":
-<https://github.com/metaobjectsdev/metaobjects/blob/main/docs/recipes/write-your-own-generator.md>.
+<https://github.com/metaobjectsdev/metaobjects/blob/v1.1.0/docs/recipes/write-your-own-generator.md>.
 
-**Eject instead** only when a reference generator already emits something close to what
-you need: `meta gen --list --probe` is the catalog, `meta eject <name>` copies one in.
+**Use a stock generator as shipped** when one already emits what you need:
+`meta gen --list --probe` is the catalog, and each row says how to wire it with nothing
+copied into the repo (an import line on TypeScript, a stable name on the other ports). An
+upgrade is then how its fixes reach you. **Eject** when a reference generator is close and
+you need to change what it emits: `meta eject <name>` copies it in. Do not eject a
+generator you are not going to change, because an unmodified copy only duplicates the
+reference and falls behind it.
 **Hand-write** only what the model cannot express — business logic, calls to other
 systems — and have it import the generated types.
 
@@ -121,25 +157,26 @@ systems — and have it import the generated types.
 
 You run a `gen` step. The runner:
 
-1. Loads all metadata under `metaobjects/` (the same loader the runtime uses).
+1. Loads the project's metadata from wherever its configuration points (the same loader
+   the runtime uses): `sources` in `.metaobjects/config.json` (TypeScript, and C# when gen
+   names no `<metadataDir>`), `metadata` in `metaobjects.config.yaml` (Python), the
+   plugin's `<loader><sourceDir>` (Java, Kotlin). `metaobjects/` is only the default.
 2. Resolves output targets and precomputes shared render state.
 3. Runs each configured **generator** — most emit one file per entity; some emit a
    single shared file (a barrel, a DB-context, an app-config).
-4. Decides whether it may overwrite a file — and **the rule differs by port**:
-   - **TypeScript, C#, Python** — by a committed **hash manifest**
-     (`.metaobjects/.gen-state/.hashes.json`). If a file still hashes to what the
-     generator recorded writing, it is safe to overwrite; if it was edited, or there is
-     no record of it, the write is **refused by name**. TypeScript additionally
-     three-way-merges against a snapshot when one is present locally.
-   - **Java, Kotlin** — by a bare **`GENERATED`** token in the file's header comment
-     (`GeneratedFileWriter.GENERATED_MARKER`). The token is `GENERATED`, **not**
-     `@generated`: the matcher allows only whitespace between the comment punctuation
-     and the token, so an `@`-prefixed tag does not match it. Remove that token and
-     regeneration never touches the file again.
+4. Decides whether it may overwrite a file, by a committed **hash manifest**
+   (`.metaobjects/.gen-state/.hashes.json`) on every port. If a file still hashes to what
+   the generator recorded writing, it is safe to overwrite; if it was edited, or there is
+   no record of it, the write is **refused by name**. TypeScript additionally
+   three-way-merges against a snapshot when one is present locally. **Commit the
+   manifest.** Java and Kotlin have used it since 8.1.0: there, a file with no record that
+   carries the bare **`GENERATED`** header token (not `@generated`) is adopted as generated
+   output, which is how the first run after upgrading from 8.0.x records everything.
 
-   **A refusal FAILS the run — exit 1 on every port** (TypeScript always did; Python and
-   C# warned and exited 0 until 1.0, so a `gen` wired into CI was green while codegen
-   refused to write). The one-time fix for a project that predates the committed manifest
+   **A refusal FAILS the run — exit 1 on TypeScript, C# and Python** (Python and C# warned
+   and exited 0 until 1.0, so a `gen` wired into CI was green while codegen refused to
+   write). On Java and Kotlin a refusal is a warning and `mvn metaobjects:verify` is the
+   gate that fails. The one-time fix for a project that predates the committed manifest
    is **`gen --baseline=adopt`**: it records the files you have as the baseline and writes
    nothing, so there is finally a `.hashes.json` to commit — then `gen` again, and the
    regeneration lands as its own diff. Adopting DECLARES those files to be generated
@@ -147,16 +184,28 @@ You run a `gen` step. The runner:
    replaces it; commit before you run it. (TypeScript additionally has
    `--baseline=fresh`: write fresh output now and discard the edits.)
 
-   **The two rules protect a hand edit in opposite ways, so do not carry a habit across
-   ports.** On TypeScript, C# and Python, *editing the content* is what takes ownership —
-   that is what breaks the hash — and deleting the header changes nothing except your
-   ability to tell what generated the file. On Java and Kotlin the reverse holds: editing
-   a file protects it not at all, because the `GENERATED` token is still there and the
-   next run overwrites the edit; only removing that token does.
+   **Output nobody should edit: set `handEdits: overwrite` on its generator entry.** The
+   default, `keep`, refuses an edited file. `overwrite` replaces it with fresh output, names
+   it, and re-baselines it; `verify --codegen` then reports the edit as drift that `gen`
+   fixes. A file the manifest has no record of is refused either way. TypeScript
+   `{ ...entityFile(), handEdits: "overwrite" }`; Python `{ name: entity, handEdits: overwrite }`
+   in `metaobjects.config.yaml`; C# `new EntityGenerator().WithHandEdits(HandEdits.Overwrite)`;
+   Java and Kotlin `<handEdits>overwrite</handEdits>` on the `<generator>`.
 
-   (The header text differs per port and none of it is the write decision on the
-   hash-manifest ports: TypeScript and Python emit `@generated by …`, C# emits
-   `<auto-generated/>`, Java and Kotlin emit the `GENERATED` token above.)
+   **A full `gen` deletes generated files it no longer emits** (a renamed or deleted object,
+   a page that moved package). Only files the manifest records, only when untouched, and
+   never on a run narrowed by `--generators` or an entity filter. An edited one is refused by
+   name, and `verify --codegen` says to delete it: regeneration cannot follow a rename, so
+   move the edits into the new file first if you want them. Details:
+   `docs/features/own-your-codegen.md`, "Files that are no longer generated".
+
+   On every port *editing the content* is what takes ownership — that is what breaks the
+   hash — and deleting the header is just another edit. (Through Maven 8.0.x, Java and
+   Kotlin did the reverse: an edit was overwritten and only removing the `GENERATED` token
+   protected a file. Do not carry that habit forward.)
+
+   (The header text differs per port and is not the write decision: TypeScript and Python
+   emit `@generated by …`, C# emits `<auto-generated/>`, Java and Kotlin emit `GENERATED`.)
 
 The output is normal idiomatic code in your language — you import it and use it
 like any hand-written module.
@@ -229,11 +278,16 @@ reads as an invitation to adopt the surface you decided against.
 
 ## Selecting generators — NOTHING is generated until you choose it
 
-**`meta init` wires no generators, and no port ships a default suite.** A fresh
-scaffold has `generators: []` and an empty `codegen/generators/`; `--generators` is
-required on the C# and Python CLIs; Java has never had a default set. Choosing what an
-application needs is a judgment over its purpose and stack, and the tool's job is to
-make that choice cheap and truthful, not to make it for you.
+**`meta init` wires no generators, and no port ships a default suite.** A fresh TypeScript
+scaffold has `generators: []` and an empty `codegen/generators/`; a fresh C# scaffold
+(`dotnet meta init`) has an empty `codegen/Generators.cs`; Java and Python have never had a
+default set. In every port the project's own generator list — `generators` in
+`metaobjects.config.ts`, `codegen/Generators.cs`, a target's `generators` in
+`metaobjects.config.yaml`, or `<generators>` in the pom — is the COMPLETE list,
+documentation included (ADR-0034 Amendment 9); `--generators` (Maven: a second
+`<execution>`) only narrows a run to entries already in it. Choosing what an application
+needs is a judgment over its purpose and stack, and the tool's job is to make that choice
+cheap and truthful, not to make it for you.
 
 Each generator has a **stable name** (kebab-case) that is the same in every port and
 surfaces in diagnostics — reference generators by that name, never by inlining what
@@ -261,7 +315,12 @@ they emit.
    - Do **NOT** apply that rule to `client`. `@metaobjectsdev/tanstack` peers on
      `react`, so a form generator plus the TanStack hook/grid generators is the
      intended composition, not a conflict.
-5. **`meta eject <names...> --format json`** — copies each into `codegen/generators/`
+5. **Wire what you chose.** A generator you will run unchanged is wired from its package:
+   on TypeScript each catalog row carries `wire.import`, plus `install` and `configKeys`,
+   and you write the call from the generator's documented options; on the other ports you
+   select it by its stable name. Copy nothing.
+   For a generator whose output you need to change,
+   **`meta eject <names...> --format json`** copies each into `codegen/generators/`
    (yours to edit), and reports the import line, the entry to add to `generators`, one
    consolidated install command, and any config keys those generators read. On
    TypeScript, a generator whose output calls an HTTP adapter (`routes`, `routes-hono`,
@@ -282,7 +341,7 @@ implies that you have not wired.
 | `persistence` | how rows are read and written | app shape |
 | `api` | the HTTP surface — pick one framework | app shape |
 | `client` | the browser tier | app shape |
-| `docs` | on by default; the canonical door is `meta docs` | — |
+| `docs` | model pages, api reference, agent pages, requirement ledger — each its own generator entry, like any other | app shape |
 | `capability` | prompts, parsers, payloads, traces, test stubs | **`--probe`** |
 
 At intent level: a **headless data service** is `model` + `persistence`; an **HTTP API**

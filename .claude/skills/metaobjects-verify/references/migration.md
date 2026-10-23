@@ -14,6 +14,18 @@ So even in a Java / Python / C# / Kotlin project you run `meta migrate` and
 `meta verify --db` through Node. Only schema crosses to Node; per-port `gen`/codegen
 stays native to the language.
 
+## Contents
+- Install (Node, dev-only)
+- Output format
+- The workflow
+- Dialects
+- Live-DB drift: `meta verify --db`
+- Index modeling (Postgres)
+- Projection views (generated view DDL)
+- DDL-ownership escape valves (`@sql` / `@unmanaged`) — #208
+- Adopting an existing database (non-destructive)
+- Not yet shipped
+
 ## Install (Node, dev-only)
 
 ```bash

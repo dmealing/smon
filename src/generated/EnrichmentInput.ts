@@ -9,3 +9,17 @@ export interface EnrichmentInput {
 export const EnrichmentInputInsertSchema = z.object({
   digest: z.string().min(1),
 });
+/**
+ * Metadata constants for the value object EnrichmentInput: each field's name, label, view and the
+ * validation rules derived from its validator children (e.g. `EnrichmentInput.<field>.rules.maxLength.value`).
+ */
+export const EnrichmentInput = {
+  $entity: "EnrichmentInput",
+  digest: {
+    name: "digest",
+    label: "Digest",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Digest is required" },
+  },
+} as const;

@@ -14,6 +14,22 @@ classify it (using the classification scheme in `SKILL.md`) and route the cutove
 
 ---
 
+## Contents
+- Object — `object.*`
+- Field — `field.*`
+- Source — `source.rdb`
+- Relationship — `relationship.*`
+- Identity — `identity.*`
+- Index — `index.*` (non-unique retrieval)
+- Origin — `origin.*` (derived fields — on projections AND entity read-views)
+- Validator — `validator.*`
+- View / Layout — `view.*`, `layout.*`
+- Template — `template.*` (prompt pillar)
+- Attr — `attr.*`
+- Requirement — `requirement.*` (capability ledger)
+- Common documentation attrs (any node)
+- Cross-cutting
+
 ## Object — `object.*`
 
 - **`object.entity`** (`@discriminator` / `@discriminatorValue` for STI/TPH) — hunt
@@ -72,13 +88,15 @@ classify it (using the classification scheme in `SKILL.md`) and route the cutove
   names artifact from the declaration, so a literal is a second source of truth even when it
   agrees with the naming strategy today. A typed ORM handle in its place is correct. **Check
   the artifact is emitted at all before scoring the literals: on every port the selection IS
-  the complete list — the config's on TypeScript and the JVM, `--generators` on C# and Python —
+  the complete list, documentation included — `generators: [...]` in `metaobjects.config.ts`
+  (TypeScript), `codegen/Generators.cs` (C#), a target's `generators` in
+  `metaobjects.config.yaml` (Python), `<generators>` in the pom (Java, Kotlin) —
   so an existing project emits none and the un-wired generator is the finding FIRST** (no port
-  ships a default suite; ADR-0034 Amendment 2). **This entry is the physical-name INSTANCE of signature 11.** The rule that
+  ships a default suite; ADR-0034 Amendments 2 and 9). **This entry is the physical-name INSTANCE of signature 11.** The rule that
   generates the rest — and the reason an enum member compared as a bare string is NOT one — is
   the Cross-cutting entry below.
 - **`@kind` = `view` / `materializedView`** — hunt hand-written SQL views where an authored
-  read-only source belongs. Apply the **view-necessity test** (SKILL.md, drift signature 8): a
+  read-only source belongs. Apply the **view-necessity test** (`drift-signatures.md`, signature 8): a
   hand-written `CREATE VIEW` (or read-only SQL mirroring a read model) is a CODEGEN CANDIDATE when
   its shape is expressible via `origin.passthrough` / `origin.aggregate` /
   `origin.computed` / `origin.first` + `extends`. Route by shape: an entity's OWN columns plus an
@@ -176,10 +194,12 @@ soft-delete / status / type view it models.
   options the currency view models. **Cross-port-gated** (with `view.base`).
 - **`layout.dataGrid`** (`@columns`, `@defaultSortField`, `@defaultSortOrder`, `@pageSize`) —
   hunt hand-written grid column definitions + data hooks a data-grid layout generates.
-- **CALIBRATION — TS/web-only:** the `view.*` widget subtypes exist only for TS/web consumers
+- **CALIBRATION — TS/web-only:** the `view.*` widget subtypes are consumed only by TS/web
   and are NOT in the cross-port registry — `view.text`, `view.textarea`, `view.date`,
-  `view.month`, `view.hotlink`, `view.dropdown`, `view.radio`, `view.checkbox`, `view.number`,
-  `view.password`, `view.hidden`, `view.web`. **Audit these only for TS adopters.** Only
+  `view.month`, `view.hotlink`, `view.image`, `view.dropdown`, `view.radio`, `view.checkbox`,
+  `view.number`, `view.password`, `view.hidden`, `view.web`. Every port LOADS them, so shared metadata that
+  carries them is valid in a backend port; nothing outside TS/web reads them. **Audit these
+  only for TS adopters.** Only
   `view.base` / `view.currency` are cross-port-gated.
 
 ## Template — `template.*` (prompt pillar)
@@ -220,7 +240,7 @@ artifact for a person or a file and generates **no parser**.
   closed* variant set hand-coded as parallel modules (channels / providers / export targets)
   that a project-registered subtype with a closed variant discriminator + a small owned
   generator would own. Apply the ADR-0037 ordered test before proposing; advisory (VOCAB
-  CANDIDATE); see SKILL.md axis I "New-vocabulary OPPORTUNITY".
+  CANDIDATE); see `vocabulary-hygiene.md` "New-vocabulary OPPORTUNITY".
 
 ## Requirement — `requirement.*` (capability ledger)
 
@@ -254,8 +274,8 @@ to nothing, and does not check that each claimed node complies).
   accepted.
 - **The doc slots behave differently on this node type** — do not audit them by the generic
   rule below. `title` is CHARTERED here (a requirement's `name` is an identifier, so the label
-  lives in `title`) and is **rendered** by `meta docs`, heading each entry after its dotted
-  path; `summary` is INERT (nothing reads it, and `@statement` is already the required
+  lives in `title`) and is **rendered** by `meta gen`'s `requirementsFile()`, heading each
+  entry after its dotted path; `summary` is INERT (nothing reads it, and `@statement` is already the required
   one-liner) and `meta verify` warns on one. So an absent `summary` is correct, a populated
   one is the finding, and a populated `title` is correct.
 - **CALIBRATION — entirely opt-in and warning-only where it counts.** A project declaring no
@@ -309,7 +329,7 @@ to nothing, and does not check that each claimed node complies).
   constant) are exempt as consequences of that rule, not as a list. Raw SQL, the API resource path and
   the hand-built form are the three commonest shapes, never the set; a GraphQL field, a queue topic, a
   cache key or a `COPY` header scores by the same rule. Procedure, the emitted-vs-adopted ratio and the
-  deferral rule: SKILL.md signature 11.
+  deferral rule: `drift-signatures.md` signature 11.
 
 - **`extends`** (any depth, cross-package `::`) — hunt copy-pasted base-entity field blocks
   that should be an abstract base inherited via `extends` (the inheritance mechanism;
@@ -331,9 +351,10 @@ to nothing, and does not check that each claimed node complies).
     non-`table` source-kind / flattened-object codegen is partial). **C#** has no
     ObjectManager runtime tier (EF Core *is* the runtime) — hand services over the generated
     `DbContext` are expected.
-- **Single-source config** — `apiPrefix` (URL prefix wired into routes + hooks) and
-  `columnNamingStrategy` (snake_case / literal / kebab-case) and per-target output dirs:
-  hunt these values hard-coded in multiple places instead of resolved from config.
+- **Single-source config** — `apiPrefix` (URL prefix wired into routes + hooks), the
+  `naming` block of `.metaobjects/config.json` (column and table rules, read by every port)
+  and per-target output dirs: hunt these values hard-coded in multiple places instead of
+  resolved from config.
 - **CALIBRATION — planned, not yet shipped:** the declared-API surface (`api.base`,
   `api.operational`, `operation.query`, `operation.command`, `binding.rest`) and MCP exposure
   of declared prompts/tools are **not yet in the registry** — their absence is not an adopter

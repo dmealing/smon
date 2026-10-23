@@ -15,3 +15,31 @@ export const HeartbeatPayloadInsertSchema = z.object({
   msg: z.string().min(1),
   pingMs: z.number().int(),
 });
+/**
+ * Metadata constants for the value object HeartbeatPayload: each field's name, label, view and the
+ * validation rules derived from its validator children (e.g. `HeartbeatPayload.<field>.rules.maxLength.value`).
+ */
+export const HeartbeatPayload = {
+  $entity: "HeartbeatPayload",
+  status: {
+    name: "status",
+    label: "Status",
+    view: "dropdown",
+    rules: { required: "Status is required" },
+    options: ["up", "down"] as const,
+  },
+  msg: {
+    name: "msg",
+    label: "Msg",
+    view: "text",
+    htmlType: "text",
+    rules: { required: "Msg is required" },
+  },
+  pingMs: {
+    name: "pingMs",
+    label: "Ping Ms",
+    view: "number",
+    htmlType: "number",
+    rules: { required: "Ping Ms is required" },
+  },
+} as const;

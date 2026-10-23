@@ -108,18 +108,18 @@ Generate code from the metadata model (regenerates `src/generated/*` and
 bun run gen
 ```
 
-Check that generated code hasn't drifted from the metadata (three gates: template bodies,
-generated code, generated docs):
+Check that generated code hasn't drifted from the metadata (two gates: template bodies,
+generated code including the docs pages):
 
 ```bash
 bun run verify
 ```
 
-Regenerate the model/API reference pages under `docs/` (`bun run verify` fails if the
-committed pages have drifted from the model):
+Regenerate the model/API reference pages under `docs/` (documentation is a generator, so
+`bun run gen` writes them; `bun run verify` fails if the committed pages have drifted from the model):
 
 ```bash
-bun run docs
+bun run gen
 ```
 
 Run tests:
@@ -184,10 +184,10 @@ The same two tables, generated from the same metadata, are published as referenc
 - **Generated monitoring reference:** [`docs/generated/monitoring.md`](docs/generated/monitoring.md)
   — emitted by `bun run gen` (smon's own `codegen/generators/monitor-docs.ts`).
 - **Generated model + API reference:** [`docs/README.md`](docs/README.md) and
-  [`docs/api/AGENT-API.md`](docs/api/AGENT-API.md) — emitted by `bun run docs`
-  (`meta docs`), one page per `object.value` and per template, plus a
+  [`docs/api/AGENT-API.md`](docs/api/AGENT-API.md) — emitted by `bun run gen`
+  (`docsFile()` / `apiDocsFile()`), one page per `object.value` and per template, plus a
   call-it-exactly-as-written API page. Both directories are gated: `bun run verify`
-  regenerates them into a temp tree and fails on any difference.
+  fails when the model changes without a regen (CI's `bun run gen` + no-diff step catches hand edits).
 
 ## Status
 
