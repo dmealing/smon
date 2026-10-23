@@ -33,14 +33,15 @@
 // composes-with: queries.ts, routes.ts, barrel.ts (they import the files this emits).
 //
 // The composition (`renderEntity`) is the relocated body of the built-in entity composer —
-// byte-identical to start, now YOURS to change. It imports only public engine primitives.
+// byte-identical to start, now YOURS to change. It imports the engine from the package and
+// the renderers from `../templates/`, which `meta eject` copies beside it.
 
 // ts-poet combinators come from the engine package, NOT a bare "ts-poet" import: the
 // Code sections composed here must share ONE ts-poet instance with the render*
 // primitives below, or (with a globally-installed / linked CLI, where the project and
 // the CLI resolve ts-poet to different physical copies) every section renders
 // standalone with its own duplicate import header.
-import { joinCode, type Code, effectivePackage } from "@metaobjectsdev/codegen-ts";
+import { joinCode, type Code, effectivePackage } from "@metaobjectsdev/codegen-ts/engine";
 import type { MetaObject } from "@metaobjectsdev/metadata";
 import {
   perEntity,
@@ -49,30 +50,10 @@ import {
   type Generator,
   type GeneratorFactory,
   type RenderContext,
-  // sub-renderers (engine primitives) — the LEGO blocks this composition assembles:
-  renderDrizzleSchema,
-  renderInferredTypes,
-  renderEnumTypeAliases,
-  renderZodValidators,
-  renderEntityConstants,
-  renderFilterAllowlist,
-  renderSortAllowlist,
-  renderFilterType,
-  renderTphDiscriminatorUnion,
-  isTphDiscriminatorBase,
-  renderProjectionDecl,
-  renderValueObjectFile,
-  renderSharedEnumsFile,
-  SHARED_ENUMS_BASENAME,
-  // predicates + helpers:
   isProjection,
   isWriteThrough,
   isAbstract,
   hasWritableRdbSource,
-  isTphSubtype,
-  // engine composer — used for the delegated write-through variant:
-  renderEntityFile,
-  // engine plumbing:
   formatTs,
   ownedRuntimeImport,
   entityOutputPath,
@@ -81,7 +62,22 @@ import {
   GENERATED_HEADER,
   GENERATED_EDIT_NOTE,
   sidecarLine,
-} from "@metaobjectsdev/codegen-ts";
+  isTphSubtype,
+} from "@metaobjectsdev/codegen-ts/engine";
+import { renderDrizzleSchema } from "../templates/drizzle-schema.js";
+import { renderEntityConstants } from "../templates/entity-constants.js";
+import { renderEntityFile } from "../templates/entity-file.js";
+import { renderSharedEnumsFile, SHARED_ENUMS_BASENAME } from "../templates/enums-file.js";
+import { renderFilterAllowlist, renderSortAllowlist } from "../templates/filter-allowlist.js";
+import { renderFilterType } from "../templates/filter-type.js";
+import { renderInferredTypes, renderEnumTypeAliases } from "../templates/inferred-types.js";
+import { renderProjectionDecl } from "../templates/projection-decl.js";
+import {
+  renderTphDiscriminatorUnion,
+  isTphDiscriminatorBase,
+} from "../templates/tph-discriminator.js";
+import { renderValueObjectFile } from "../templates/value-object-file.js";
+import { renderZodValidators } from "../templates/zod-validators.js";
 
 export interface RenderEntityOpts {
   readonly allowlists?: boolean;
@@ -126,8 +122,8 @@ function renderEntity(entity: MetaObject, ctx: RenderContext, opts?: RenderEntit
   }
   // #214 — a write-through entity read-view (writable table + a read-only replica view +
   // derived origin.* fields) needs the hybrid file (table + `.existing()` view decl + a
-  // z.infer read type carrying the derived fields). Delegate to the engine composer rather
-  // than duplicate that branch here (mirrors the projection delegation above).
+  // z.infer read type carrying the derived fields). Delegate to `renderEntityFile` (copied
+  // beside this file, `templates/entity-file.ts`) rather than duplicate that branch here (mirrors the projection delegation above).
   if (isWriteThrough(entity)) {
     return renderEntityFile(entity, ctx, { allowlists });
   }
