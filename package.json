@@ -3,6 +3,7 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "gen": "meta gen",
     "verify": "meta verify --templates --codegen --prompts templates",

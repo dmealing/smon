@@ -198,3 +198,7 @@ covered by the parity-oracle test suite (bash-behavior-equivalence cases plus re
 cases for bugs found along the way). Deployment tooling (installing `dist/smon.js` on a
 host, per-host configuration, and retiring the legacy bash implementation it's ported
 from) is out of scope for this repository and tracked separately.
+
+## Licence
+
+MIT, see [LICENSE](LICENSE).
