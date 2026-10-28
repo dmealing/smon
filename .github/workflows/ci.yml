@@ -1,6 +1,6 @@
 name: CI
 
-# Four gates, run in this order because each catches a DIFFERENT class of drift/breakage:
+# Four gates (plus a type-check), run in this order because each catches a DIFFERENT class of drift/breakage:
 #
 #   1. `bun run gen` + assert no diff — regenerates src/generated/* and docs/generated/*
 #      from metaobjects/*.json and fails if the committed output doesn't match. It is the
@@ -27,10 +27,11 @@ name: CI
 #   3. `bun test` — the full unit/behavior suite (parser, runner, policy, notify adapters,
 #      enrichment, parity-oracle cases) INCLUDING test/drift.test.ts, which proves the two
 #      gates above actually bite by mutating a throwaway copy of this repo four ways.
-#   Type-check (`bun run typecheck`, `tsc --noEmit` on tsconfig.json) runs before verify.
-#   `bun run build` also runs typecheck + verify itself, so a build never ships unchecked.
-#   `--db`/`--requirements` are omitted: smon has no database and no requirement.* nodes.
 #   4. `bun run build` — produces dist/smon.js (bundled for node runtime semantics).
+#
+# Also: `tsc --noEmit` (`bun run typecheck`) runs before verify, and `bun run build` re-runs
+# typecheck + verify itself so a build never ships unchecked. `--db` and the requirements
+# check are omitted: smon has no database and no requirement.* nodes.
 #
 # gen and verify are NOT redundant — see the CI note in README.md's gates section.
 
