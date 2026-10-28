@@ -9,8 +9,7 @@
     "verify": "meta verify --templates --codegen --prompts templates",
     "test": "bun test",
     "build": "bun run typecheck && bun run verify && bun build src/cli.ts --target=node --outfile dist/smon.js",
-    "typecheck": "tsc --noEmit",
-    "check": "bun run typecheck && bun run verify && bun test"
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@metaobjectsdev/cli": "1.1.4",

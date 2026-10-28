@@ -135,10 +135,10 @@ bun run build
 ```
 
 `bun run typecheck` (`tsc --noEmit`) also runs in CI, and `bun run build` runs it plus
-`verify` before bundling; `bun run check` runs typecheck, verify and tests locally. The
-four commands above are the sequence [CI](.github/workflows/ci.yml) runs on every
-push and pull request — see that workflow's header comment for why `gen` (with a
-clean-tree assertion) and `verify` are both required rather than redundant.
+`verify` before bundling. The four commands above are the sequence
+[CI](.github/workflows/ci.yml) runs on every push and pull request — see that
+workflow's header comment for why `gen` (with a clean-tree assertion) and `verify`
+are both required rather than redundant.
 
 ## Usage
 
