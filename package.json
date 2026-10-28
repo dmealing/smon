@@ -8,20 +8,22 @@
     "gen": "meta gen",
     "verify": "meta verify --templates --codegen --prompts templates",
     "test": "bun test",
-    "build": "bun build src/cli.ts --target=node --outfile dist/smon.js"
+    "build": "bun run typecheck && bun run verify && bun build src/cli.ts --target=node --outfile dist/smon.js",
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun run verify && bun test"
   },
   "devDependencies": {
-    "@metaobjectsdev/cli": "1.1.0",
-    "@metaobjectsdev/codegen-ts": "1.1.0",
+    "@metaobjectsdev/cli": "1.1.4",
+    "@metaobjectsdev/codegen-ts": "1.1.4",
     "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
-    "@metaobjectsdev/metadata": "1.1.0",
-    "@metaobjectsdev/render": "1.1.0",
-    "@metaobjectsdev/runtime-ts": "1.1.0",
+    "@metaobjectsdev/metadata": "1.1.4",
+    "@metaobjectsdev/render": "1.1.4",
+    "@metaobjectsdev/runtime-ts": "1.1.4",
     "zod": "^3.25.76"
   }
 }

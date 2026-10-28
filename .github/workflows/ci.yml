@@ -27,6 +27,9 @@ name: CI
 #   3. `bun test` — the full unit/behavior suite (parser, runner, policy, notify adapters,
 #      enrichment, parity-oracle cases) INCLUDING test/drift.test.ts, which proves the two
 #      gates above actually bite by mutating a throwaway copy of this repo four ways.
+#   Type-check (`bun run typecheck`, `tsc --noEmit` on tsconfig.json) runs before verify.
+#   `bun run build` also runs typecheck + verify itself, so a build never ships unchecked.
+#   `--db`/`--requirements` are omitted: smon has no database and no requirement.* nodes.
 #   4. `bun run build` — produces dist/smon.js (bundled for node runtime semantics).
 #
 # gen and verify are NOT redundant — see the CI note in README.md's gates section.
@@ -64,6 +67,9 @@ jobs:
 
       - name: Assert generated output matches metadata (no diff)
         run: git diff --exit-code
+
+      - name: Type-check (tsc --noEmit)
+        run: bun run typecheck
 
       - name: meta verify (templates + codegen drift gates)
         run: bun run verify
