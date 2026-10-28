@@ -5,14 +5,14 @@
     "": {
       "name": "smon",
       "dependencies": {
-        "@metaobjectsdev/metadata": "1.1.0",
-        "@metaobjectsdev/render": "1.1.0",
-        "@metaobjectsdev/runtime-ts": "1.1.0",
+        "@metaobjectsdev/metadata": "1.1.4",
+        "@metaobjectsdev/render": "1.1.4",
+        "@metaobjectsdev/runtime-ts": "1.1.4",
         "zod": "^3.25.76",
       },
       "devDependencies": {
-        "@metaobjectsdev/cli": "1.1.0",
-        "@metaobjectsdev/codegen-ts": "1.1.0",
+        "@metaobjectsdev/cli": "1.1.4",
+        "@metaobjectsdev/codegen-ts": "1.1.4",
         "@types/bun": "latest",
       },
       "peerDependencies": {
@@ -71,25 +71,25 @@
 
     "@libsql/win32-x64-msvc": ["@libsql/win32-x64-msvc@0.3.19", "", { "os": "win32", "cpu": "x64" }, "sha512-ay1X9AobE4BpzG0XPw1gplyLZPGHIgJOovvW23gUrukRegiUP62uzhpRbKNogLlUOynyXeq//prHgPXiebUfWg=="],
 
-    "@metaobjectsdev/cli": ["@metaobjectsdev/cli@1.1.0", "", { "dependencies": { "@biomejs/js-api": "^0.7.0", "@biomejs/wasm-nodejs": "^1.9.4", "@libsql/kysely-libsql": "^0.4.0", "@metaobjectsdev/codegen-ts": "1.1.0", "@metaobjectsdev/codegen-ts-react": "1.1.0", "@metaobjectsdev/codegen-ts-tanstack": "1.1.0", "@metaobjectsdev/docs-site": "1.1.0", "@metaobjectsdev/metadata": "1.1.0", "@metaobjectsdev/migrate-ts": "1.1.0", "@metaobjectsdev/render": "1.1.0", "@metaobjectsdev/runtime-ts": "1.1.0", "@metaobjectsdev/sdk": "1.1.0", "@toon-format/toon": "^2.3.0", "jiti": "^2.4.0" }, "peerDependencies": { "kysely": ">=0.27.0 <0.30.0", "pg": ">=8.0.0 <9.0.0" }, "optionalPeers": ["pg"], "bin": { "meta": "dist/bin/meta.js" } }, "sha512-hJZ6skBKSbPjb6/pnJUzzvO8NUvY2Is3ipUEEqcA2MiLEOGVXbLYgzaSpaTb+M8QinL3Sg6ej/1WTG2lWlKNsQ=="],
+    "@metaobjectsdev/cli": ["@metaobjectsdev/cli@1.1.4", "", { "dependencies": { "@biomejs/js-api": "^0.7.0", "@biomejs/wasm-nodejs": "^1.9.4", "@libsql/kysely-libsql": "^0.4.0", "@metaobjectsdev/codegen-ts": "1.1.4", "@metaobjectsdev/codegen-ts-react": "1.1.4", "@metaobjectsdev/codegen-ts-tanstack": "1.1.4", "@metaobjectsdev/docs-site": "1.1.4", "@metaobjectsdev/metadata": "1.1.4", "@metaobjectsdev/migrate-ts": "1.1.4", "@metaobjectsdev/render": "1.1.4", "@metaobjectsdev/runtime-ts": "1.1.4", "@metaobjectsdev/sdk": "1.1.4", "@toon-format/toon": "^2.3.0", "jiti": "^2.4.0" }, "peerDependencies": { "kysely": ">=0.27.0 <0.30.0", "pg": ">=8.0.0 <9.0.0" }, "optionalPeers": ["pg"], "bin": { "meta": "dist/bin/meta.js" } }, "sha512-IjaQzFfPXdMu55Dm24ntK+CAqsOt43dT96nolCZyAzIZaXf5vIy8Fn1U8Ue4bVTtsJubVAbvpgBqpp08QxMdrA=="],
 
-    "@metaobjectsdev/codegen-ts": ["@metaobjectsdev/codegen-ts@1.1.0", "", { "dependencies": { "@biomejs/js-api": "^0.7.0", "@biomejs/wasm-nodejs": "^1.9.4", "@metaobjectsdev/docs-site": "1.1.0", "@metaobjectsdev/metadata": "1.1.0", "@metaobjectsdev/render": "1.1.0", "@toon-format/toon": "^2.3.0", "ts-poet": "^6.10.0" }, "peerDependencies": { "drizzle-orm": ">=0.38.0 <1.0.0", "zod": ">=3.23.0 <5.0.0" } }, "sha512-61Xe+hbn9AXDp2lFaoWa5APkXl7dcpnTiSsdIGOMrUa8zfnj+PlHbxvgixSToHQzO6Vo1Yq/vPM9T/YmnR5dJA=="],
+    "@metaobjectsdev/codegen-ts": ["@metaobjectsdev/codegen-ts@1.1.4", "", { "dependencies": { "@biomejs/js-api": "^0.7.0", "@biomejs/wasm-nodejs": "^1.9.4", "@metaobjectsdev/docs-site": "1.1.4", "@metaobjectsdev/metadata": "1.1.4", "@metaobjectsdev/render": "1.1.4", "@toon-format/toon": "^2.3.0", "ts-poet": "^6.10.0" }, "peerDependencies": { "drizzle-orm": ">=0.38.0 <1.0.0", "zod": ">=3.23.0 <5.0.0" } }, "sha512-IPJFNndnQqafOKWbJxDNDGYi8t+aqh8e6bisVeDIW8QCb3U5qZW9ZR5ZBJ1sJ05VkoKD4+MCJBdkJvbUyjkudA=="],
 
-    "@metaobjectsdev/codegen-ts-react": ["@metaobjectsdev/codegen-ts-react@1.1.0", "", { "dependencies": { "@metaobjectsdev/codegen-ts": "1.1.0", "@metaobjectsdev/metadata": "1.1.0", "ts-poet": "^6.10.0" }, "peerDependencies": { "@biomejs/biome": ">=1.9.0 <3.0.0" } }, "sha512-EVfgDRVjMPb3aGnqtWd0a8VAqr4pF9DdzFk00GoxbwHgxJF1AI67TPkIVVlbrNQOduEMmTsBEcx4fyHTreooKQ=="],
+    "@metaobjectsdev/codegen-ts-react": ["@metaobjectsdev/codegen-ts-react@1.1.4", "", { "dependencies": { "@metaobjectsdev/codegen-ts": "1.1.4", "@metaobjectsdev/metadata": "1.1.4", "ts-poet": "^6.10.0" }, "peerDependencies": { "@biomejs/biome": ">=1.9.0 <3.0.0" } }, "sha512-4gqj+rlUc2JyEMvBb1scaO9sHmS0WbWEyDYY736n1XoqO2FCmDjPjTYYbXIjMvm9pGzqk8+6xvZZtLjrdvEE2w=="],
 
-    "@metaobjectsdev/codegen-ts-tanstack": ["@metaobjectsdev/codegen-ts-tanstack@1.1.0", "", { "dependencies": { "@metaobjectsdev/codegen-ts": "1.1.0", "@metaobjectsdev/metadata": "1.1.0", "ts-poet": "^6.10.0" }, "peerDependencies": { "@biomejs/biome": ">=1.9.0 <3.0.0" } }, "sha512-6lUgdZf0epfSfQ+LJ1ysaQRghOkP7lCM63D22XRCZ87Wi8bAVJol3+ibNMLbQpamigyWeXHlR+2yrzcjyVZxmA=="],
+    "@metaobjectsdev/codegen-ts-tanstack": ["@metaobjectsdev/codegen-ts-tanstack@1.1.4", "", { "dependencies": { "@metaobjectsdev/codegen-ts": "1.1.4", "@metaobjectsdev/metadata": "1.1.4", "ts-poet": "^6.10.0" }, "peerDependencies": { "@biomejs/biome": ">=1.9.0 <3.0.0" } }, "sha512-s5bxukvFjm1bHZISa4skUXXdp1z36gaeatLmic8uU+FbZqnmonTegvQu3WiF5StNeC7VrHF7lrXv8bBVqHWlOg=="],
 
-    "@metaobjectsdev/docs-site": ["@metaobjectsdev/docs-site@1.1.0", "", { "dependencies": { "@metaobjectsdev/metadata": "1.1.0", "@metaobjectsdev/render": "1.1.0", "yaml": "^2.9.0" } }, "sha512-RdW3sdKafc87J6Y68zl6ZbeDErPLyLo7N1oWVAX/yqHhrVxO2QY5j9ZcmVWTlHxDtYehN04t43AVmluHTgMMNA=="],
+    "@metaobjectsdev/docs-site": ["@metaobjectsdev/docs-site@1.1.4", "", { "dependencies": { "@metaobjectsdev/metadata": "1.1.4", "@metaobjectsdev/render": "1.1.4", "yaml": "^2.9.0" } }, "sha512-JvGPopyxojtXe5/RvowBoBQCuST302gvezHa2qOSJgtn7n27l1sRp3YzqjirXD/Cj026fKe7J2Usl0NGjkvJvA=="],
 
-    "@metaobjectsdev/metadata": ["@metaobjectsdev/metadata@1.1.0", "", { "dependencies": { "yaml": "^2.9.0" } }, "sha512-U7rKimTO2UfU2qBfgpCT3rHxENP/pSwYV6gFcx0VEj4qMZmuB3aFuAxRiSmPX6X0u6dMVUoeyigxJePGwrJMOA=="],
+    "@metaobjectsdev/metadata": ["@metaobjectsdev/metadata@1.1.4", "", { "dependencies": { "yaml": "^2.9.0" } }, "sha512-ph2k7wysVX8G5YHoYwYGxqNDVaItw/Ynw+CXCQM4KfxgS6Z+7zecmcfgTHRt36wCTlTMuDdkMHkSGFb1tsYC5g=="],
 
-    "@metaobjectsdev/migrate-ts": ["@metaobjectsdev/migrate-ts@1.1.0", "", { "dependencies": { "@iarna/toml": "^2.2.5", "@metaobjectsdev/metadata": "1.1.0" }, "peerDependencies": { "@electric-sql/pglite": ">=0.3.0 <0.6.0", "@libsql/kysely-libsql": ">=0.4.0 <0.5.0", "kysely": ">=0.27.0 <0.30.0" }, "optionalPeers": ["@electric-sql/pglite", "@libsql/kysely-libsql"] }, "sha512-NRP6QmxBRpxz6escVnVRF2T3FYKG9mGYbf2q+c5kSaWByu70cKngYgc6zeuyt15sebGeGAqVNObaE21hGW/0Fw=="],
+    "@metaobjectsdev/migrate-ts": ["@metaobjectsdev/migrate-ts@1.1.4", "", { "dependencies": { "@iarna/toml": "^2.2.5", "@metaobjectsdev/metadata": "1.1.4" }, "peerDependencies": { "@electric-sql/pglite": ">=0.3.0 <0.6.0", "@libsql/kysely-libsql": ">=0.4.0 <0.5.0", "kysely": ">=0.27.0 <0.30.0" }, "optionalPeers": ["@electric-sql/pglite", "@libsql/kysely-libsql"] }, "sha512-aXzzHZuY0B4ftNfBJFpbr6SMVFZDDF6eJNn9qdf7b6GnxzPjo7k2oAuvGuEwxrOpuASzpmWUWdUJmfmm6e500A=="],
 
-    "@metaobjectsdev/render": ["@metaobjectsdev/render@1.1.0", "", { "dependencies": { "mustache": "^4.2.0" } }, "sha512-AgXTZ6Ko01qjkGHvCjrgHwFFXaTMha+TKypMhLVLMuGCnrsxEit99BJY5AkPwDG5Izy4k4ksYPeDEAied0irqA=="],
+    "@metaobjectsdev/render": ["@metaobjectsdev/render@1.1.4", "", { "dependencies": { "mustache": "^4.2.0" } }, "sha512-MCYIP6/GcGyzoBEOQ3/sro/21j6ZMlIgozY0tEDEcCJK8i0CNnaJUyNIvtZHJhayZY4jWQ6o1JQe55WH0wqo9Q=="],
 
-    "@metaobjectsdev/runtime-ts": ["@metaobjectsdev/runtime-ts@1.1.0", "", { "dependencies": { "@metaobjectsdev/metadata": "1.1.0", "@metaobjectsdev/render": "1.1.0", "qs": "^6.13.0" }, "peerDependencies": { "drizzle-orm": ">=0.36.0 <1.0.0", "fastify": ">=5.0.0 <6.0.0", "hono": ">=4.0.0 <5.0.0", "kysely": ">=0.27.0 <0.30.0", "zod": ">=3.23.0 <5.0.0" }, "optionalPeers": ["drizzle-orm", "fastify", "hono", "kysely", "zod"] }, "sha512-uEYb8l9iBO5+4akA0w44YKxW/YK9lpgi8kd2Kop3fX2B8sc0RC2WHHd3Yp6ziam59IIjAtWgxG+2Gmj7uHQlzg=="],
+    "@metaobjectsdev/runtime-ts": ["@metaobjectsdev/runtime-ts@1.1.4", "", { "dependencies": { "@metaobjectsdev/metadata": "1.1.4", "@metaobjectsdev/render": "1.1.4", "qs": "^6.13.0" }, "peerDependencies": { "drizzle-orm": ">=0.36.0 <1.0.0", "fastify": ">=5.0.0 <6.0.0", "hono": ">=4.0.0 <5.0.0", "kysely": ">=0.27.0 <0.30.0", "zod": ">=3.23.0 <5.0.0" }, "optionalPeers": ["drizzle-orm", "fastify", "hono", "kysely", "zod"] }, "sha512-VCt7Ji8FMD/if10DnmKh/APgftyXFODLyc5DqBNnauEUvcn68w5REVdPhJyFzrU3r1+nEdI/hzSF4mdIjFGPVQ=="],
 
-    "@metaobjectsdev/sdk": ["@metaobjectsdev/sdk@1.1.0", "", { "dependencies": { "@metaobjectsdev/metadata": "1.1.0", "zod": "^3.23.0" } }, "sha512-zhhy9Ux4shKtYestclfCm45CMqvxKo6Dkq+A/k/upm+yJYbNl7l0pidGJ7jiwE16NGxTQQpxVq/vCairWokucg=="],
+    "@metaobjectsdev/sdk": ["@metaobjectsdev/sdk@1.1.4", "", { "dependencies": { "@metaobjectsdev/metadata": "1.1.4", "zod": "^4.6.6" } }, "sha512-0WpluC7KW8JlpzdRVei9bJ0MqORTJ7vko/8cx/GGmdyGwp9s8G3F19tuIYatkbwUdxLvMm1GZXKTzy9UD0ofIw=="],
 
     "@neon-rs/load": ["@neon-rs/load@0.0.4", "", {}, "sha512-kTPhdZyTQxB+2wpiRcFWrDcejc4JI6tkPuS7UZCG4l6Zvc5kU/gGQ/ozvHTh1XR5tS+UlfAfGuPajjzQjCiHCw=="],
 
@@ -182,6 +182,8 @@
     "yaml": ["yaml@2.9.0", "", { "bin": { "yaml": "bin.mjs" } }, "sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA=="],
 
     "zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
+
+    "@metaobjectsdev/sdk/zod": ["zod@4.6.7", "", {}, "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg=="],
 
     "libsql/detect-libc": ["detect-libc@2.0.2", "", {}, "sha512-UX6sGumvvqSaXgdKGUsgZWqcUyIXZ/vZTrlRT/iobiKhGL0zL4d3osHj3uqllWJK+i+sixDS/3COVEOFbupFyw=="],
   }
