@@ -108,7 +108,8 @@ and the model/API reference pages under `docs/`; documentation is a generator):
 bun run gen
 ```
 
-Check that template bodies and prompts still resolve against their payloads:
+Check that template bodies and prompts still resolve against their payloads, and that
+generated code has no drift or hand edits:
 
 ```bash
 bun run verify
