@@ -54,7 +54,7 @@ directory each port's `verify --codegen` reports the other ports' pages as drift
 name (`meta gen --list` prints them); it never adds one, and naming an entry the config
 does not declare is refused. A config still carrying a 1.0 `docs: { ... }` block fails
 `meta gen` and `meta verify --codegen` before writing anything, naming the block. Full
-before/after and the flag-to-option table: <https://github.com/metaobjectsdev/metaobjects/blob/v1.1.0/docs/features/migrations/docs-are-generators.md>,
+before/after and the flag-to-option table: <https://github.com/metaobjectsdev/metaobjects/blob/v1.2.0/docs/features/migrations/docs-are-generators.md>,
 section "TypeScript".
 
 **An owned docs generator goes in `generators`, like any other owned copy.** `meta eject

@@ -464,6 +464,8 @@ Reach for it when the project needs to answer any of:
 
 Every requirement must be **violable**: if you cannot say what breaking it looks like, it is a description, not a requirement.
 
+**A commit that adds, changes or removes behaviour updates the ledger in the same commit** (the new or changed claim, its `@status` and `@implementedBy`), or says in the commit message why it does not. `verify` checks that links resolve, not that the ledger is current.
+
 If the project declares any `requirement.*` node, `references/requirements.md` is installed with the full authoring rules. If it does not and you are adding the first one, the shape is:
 
 ```yaml

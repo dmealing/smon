@@ -219,6 +219,18 @@ error in every port. The emitted parser imports `zod`;
 it's usually already a dependency (Drizzle / `runtime-ts` lean on it), else
 `npm i zod`.
 
+**Jinja bodies (ADR-0061).** A body may be `<group>/<source>.jinja` (or `.j2`, `.jinja2`)
+instead of `.mustache`; `@textRef` does not change. `@metaobjectsdev/render` renders it with
+nunjucks (a dependency of the package, nothing to install) and `meta verify` checks it the same
+way, walking the parsed template; it names the `.jinja` file and line on a drift.
+`FilesystemProvider.engineOf(ref)` reports the engine of the file it found; for an
+`InMemoryProvider` pass `new InMemoryProvider(map, { engine: "jinja" })`, or pass
+`engine: "jinja"` to `render` / `verify`. A generated `render<Name>()` helper over a Jinja body
+passes `engine: "jinja"`, so it renders as Jinja through any runtime provider, and the
+runtime check runs on it as on a Mustache body. What the check cannot settle statically is
+`ERR_TEMPLATE_NOT_STATIC`. nunjucks treats an empty list as true (jinja2 does not), so test a
+list with `{% if items | length %}` when the same template must render in Python.
+
 ## See which fields a template consumes
 
 List `docsFile()` in `generators` and run `meta gen` to emit the model surface to the

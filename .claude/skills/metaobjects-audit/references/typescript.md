@@ -41,7 +41,7 @@ meta gen                        # render → 3-way merge → write (overwrites @
 meta gen --dry-run              # preview without writing
 meta gen Author Post            # scope to named entities
 meta verify --codegen           # regenerate to temp, diff vs committed output
-meta verify --templates         # check {{field}} refs vs payload VO (bare `meta verify` default)
+meta verify --templates         # check {{field}} refs vs payload VO (a bare `meta verify` runs this and `--codegen`)
 meta verify --db                # schema drift — live DB vs metadata (requires DB connection)
 meta verify --codegen --templates --db   # all three drift checks in one pass
 ```
@@ -199,4 +199,4 @@ TypeScript is the reference implementation — it ships the full feature set:
 - Output-parser codegen: **complete** (`outputParser()` generator; `parse*`/`safeParse*`/`extract*` emitted as `<Name>.response.ts` per **responding `template.prompt`** — one carrying `@responseRef`; ADR-0052).
 - ObjectManager: **complete** (`@metaobjectsdev/runtime-ts`; `kyselyDriver` / `inMemoryDriver`).
 - Schema migrate / `meta verify --db`: **complete** (TS owns the shared migrate engine — ADR-0015).
-- D1 dialect: **TS-only by design** — `dialect: "d1"` in `metaobjects.config.ts` targets Cloudflare D1 via the Wrangler CLI layout. Do NOT recommend porting D1 support to other languages.
+- D1 dialect: **TS-only by design** — `migrate.dialect: "d1"` (and `meta migrate --dialect d1`) targets Cloudflare D1 via the Wrangler CLI layout; codegen's `dialect` in `metaobjects.config.ts` is `"sqlite"` for D1 and `"d1"` there is refused. Do NOT recommend porting D1 support to other languages.

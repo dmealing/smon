@@ -38,8 +38,13 @@ artifact is a contract whose bytes a cross-port corpus pins and whose hash
 consumers verify, so everything a consumer checks stays in the package, in the two
 functions the copy calls (`buildSharedModel`, `renderSharedModelFiles`). Do not
 replace those calls: an unmodified copy publishes the same bytes as the packaged
-generator. Only TypeScript can run it in Phase 1a. **Phase 1a is TypeScript and Python
-only, full stop** — TypeScript and Python are the only two ports that can
-*consume* a dependency at all today, and only the TypeScript toolchain can
-*publish* one; Java, Kotlin, and C# do not read `dependencies` yet (Phase 2).
+generator. To publish through a package, point its `target` inside the package
+(an npm package's directory listed in `files`; a Python package's directory shipped
+as package data), run `meta gen`, then release the package as usual; consumers
+declare an `npm` or `python` dependency on it. With no `version` option the
+manifest takes the nearest `package.json` version, else a `pyproject.toml`
+`[project]` version — pass `version` when neither is the package consumers install.
+Only TypeScript can run it in Phase 1a. TypeScript, Python, Java, Kotlin (through
+Java's loader and Maven plugin) and C# can *consume* a dependency, and only the
+TypeScript toolchain can *publish* one.
 Full detail: `docs/features/metadata-dependencies.md`.

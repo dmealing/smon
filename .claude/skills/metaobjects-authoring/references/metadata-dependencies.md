@@ -7,7 +7,16 @@ build on a shared model.** A project may declare `dependencies` in
 `.metaobjects/config.json` and `meta deps sync` a publisher's metadata into a
 committed snapshot — that snapshot loads BEFORE your own files, so a foreign
 abstract resolves via `extends` and a foreign node re-opens via `overlay: true`
-exactly like a local one. Two rules are specific to that boundary:
+exactly like a local one. A dependency names one transport: `path` (a directory
+relative to the directory holding `.metaobjects/`), `npm` (an installed npm
+package, e.g. `{ "name": "acme-model", "npm": "@acme/model", "dir": "metaobjects" }`)
+or `python` (an installed Python package by its import name, e.g.
+`{ "name": "acme-model", "python": "acme_model", "dir": "metaobjects" }`). For
+`npm`/`python`, install the package with the project's package manager first;
+`meta deps sync` locates it, copies its shared model into the snapshot, and says
+what to install when it is missing. Prefer the package transport over a `path` into
+someone else's checkout when the publisher releases a package. Two rules are
+specific to that boundary:
 
 - **Say `overlay: true` on every amendment to a node you don't own.** Within one
   project the parser merges a same-`(type, package::name)` redeclaration whether
