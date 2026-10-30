@@ -5,8 +5,8 @@ name: CI
 #   1. `bun run gen` + assert no diff — regenerates src/generated/* and docs/generated/*
 #      from metaobjects/*.json and fails if the committed output doesn't match. It is the
 #      gate that proves the COMMITTED output is what the metadata currently produces.
-#   2. `bun run verify` — the metaobjects drift gates (--templates, --codegen, --prompts).
-#      Each answers a question step 1 does not:
+#   2. `bun run verify` — `meta verify --templates --codegen --forbid-hand-edits --prompts templates`:
+#      the metaobjects template, prompt and codegen drift gates. It answers a question step 1 does not:
 #        --templates  every template BODY still resolves against its payload. Since
 #                     MetaObjects 1.0 this covers `template.output @kind=email` bodies,
 #                     not only `@textRef` prompt nodes — a renamed AlertPayload field now
@@ -16,14 +16,9 @@ name: CI
 #                     longer true, and the redundancy is deliberate belt-and-braces.)
 #                     It also runs the ERR_SMON_* provider validators over
 #                     adapter.notify / probe.bash, because both gates LOAD the model.
-#        --codegen    the committed generated files are the ones codegen wrote and a fresh
-#                     regen still emits them. Distinct from step 1: it reads
-#                     .metaobjects/.gen-state/.hashes.json (committed for exactly this
-#                     reason) so it can also tell a hand-edited generated file, and an
-#                     orphan we wrote but no longer emit, from a clean tree.
-#                     Since 1.1.0 documentation is a generator in metaobjects.config.ts, so
-#                     --codegen also covers docs/*.md, docs/api/*.md and
-#                     docs/generated/monitoring.md (`meta verify --docs` was removed).
+#        --codegen    stale generated output fails (step 1 also catches it, by regen + no diff).
+#        --forbid-hand-edits  any hand edit inside generated code fails. Without it, a hand
+#                     edit is only a notice, so it would pass CI.
 #   3. `bun test` — the full unit/behavior suite (parser, runner, policy, notify adapters,
 #      enrichment, parity-oracle cases) INCLUDING test/drift.test.ts, which proves the two
 #      gates above actually bite by mutating a throwaway copy of this repo four ways.
@@ -72,7 +67,7 @@ jobs:
       - name: Type-check (tsc --noEmit)
         run: bun run typecheck
 
-      - name: meta verify (templates + codegen drift gates)
+      - name: meta verify (template, prompt and codegen drift gates)
         run: bun run verify
 
       - name: Test

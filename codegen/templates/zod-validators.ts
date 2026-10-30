@@ -9,6 +9,7 @@
 // object-array field collapsed to z.array(z.string()) and the JSON Schema sent
 // downstream (e.g. to LLM tool_use input_schema) lost the nested object shape.
 
+import { entityTypeNames } from "./entity-type-names.js";
 import { code, joinCode, imp, type Code } from "@metaobjectsdev/codegen-ts/engine";
 import { MetaObject, MetaField, type MetaRoot, stripPackage } from "@metaobjectsdev/metadata";
 import {
@@ -529,6 +530,7 @@ export function renderZodValidators(obj: MetaObject, ctx?: RenderContext): Code 
   const insertSchemaName = `${objName}InsertSchema`;
   const updateSchemaName = `${objName}UpdateSchema`;
   const preservingSchemaName = `${objName}InsertPreservingSchema`;
+  const { create: createName, patch: patchName } = entityTypeNames(obj, { name: objName });
 
   const docs = renderDocsFor(obj);
   const docsPrefix = docs ? `${docs}\n` : "";
@@ -561,11 +563,11 @@ ${joinCode(updateFieldLines, { on: ",\n" })}
 /** Typed create shape for ${objName}: the insert schema's INPUT (pre-transform) type. A
  * renamed/dropped/misspelt field is a compile error at every \`create${objName}\` call site;
  * the schema still validates at runtime. */
-export type ${objName}Create = ${z}.input<typeof ${insertSchemaName}>;
+export type ${createName} = ${z}.input<typeof ${insertSchemaName}>;
 
 /** Typed patch shape for ${objName}: every settable field, optional (FR-035 PATCH). A
  * renamed/dropped field is a compile error at every \`update${objName}\` call site. */
-export type ${objName}Patch = ${z}.input<typeof ${updateSchemaName}>;${preservingBlock}
+export type ${patchName} = ${z}.input<typeof ${updateSchemaName}>;${preservingBlock}
 `;
 }
 

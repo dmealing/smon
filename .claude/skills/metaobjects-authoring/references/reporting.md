@@ -64,6 +64,8 @@ Only those last two rows make a measure other than `count`, or a dimension reach
 
 A filter value `{ "now": "-P30D" }` (the current time plus a signed ISO-8601 duration) is legal only on a `field.date` or `field.timestamp`, under `gt`, `gte`, `lt` or `lte`, and only in the `@filter` of a `segment`, a `measure.aggregate` or an `object.report`. It is evaluated when the view is **queried**, against the UTC clock.
 
+Add `"startOf": "day"`, `"week"` or `"month"` to cut the window to a calendar boundary: `{ "now": "-P90D", "startOf": "day" }` is midnight UTC, 90 days back, not 90 days before the moment of the query. The duration is applied first, then the result is truncated, and a week starts on Monday. No other unit is accepted (`ERR_BAD_ATTR_FILTER`), and there is no time-zone form.
+
 ## Nulls and zeros
 
 - A `count` is `0` over nothing, never null. It counts rows whose `@of` column is not null; a tuple with any null component is not counted.
@@ -166,7 +168,7 @@ A concrete report whose read source is `@kind: view` is served by every port's g
 - `<segment>` is the report name, snake_cased then pluralized, like any object: `InvoicesByMonth` is `/invoices_by_months`, `StoreTotals` is `/store_totals`. There is no report-specific spelling.
 - **Every derived field with filter operators is filterable and sortable**, dimension and measure alike, with its type's own operators. You cannot narrow that set: a report has no field to put `@filterable` on. A field of the `@from` entity that the report does not expose is refused with a `400`.
 - A time dimension at `day` or coarser is `YYYY-MM-DD`; a null measure is `null` with the key present (a measure with `@default` is never null); `currency` is integer minor units.
-- **A decimal (`avg`, a ratio, a `sum` of a decimal) is one canonical string in every port** (ADR-0019 Amendment 1: `12.5`, never `12.50` or an exponent). Display formatting is a view's job. Do not parse it as a float to compare.
+- **A decimal (`avg`, a ratio, a `sum` of a decimal) is written per the project's `wire` setting**: by default, the port's language-standard form (a JSON number in C#, Java and Kotlin; a string in Python and TypeScript), and under `"wire": { "decimals": "string" }` one canonical string in every port (`12.5`, never `12.50` or an exponent). Do not parse it as a float to compare.
 - `meta gen` writes a model page for every report (`docsFile()`; a sourceless one is marked "Not served") and an API page for a served one (`apiDocsFile()`) — each an ordinary entry in `generators`.
 
 The files each port generates are in the `metaobjects-codegen` skill's reference for that language ("Reports").

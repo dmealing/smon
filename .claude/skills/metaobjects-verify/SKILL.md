@@ -92,15 +92,16 @@ JSON. A pass that did not run reports `status: "skipped"` and why, so an empty l
 always means "found nothing", never "never looked"; what the payload does not carry
 is named in its own `notRepresented[]`.
 
-**A bare `verify` is a partial check, not the full gate.** The Node/C# default runs
-only `--templates`; Java/Python's bare default runs only `--codegen` — either way,
-paired with the advisory anti-pattern pass above, never all three subverbs. Treat a
-bare run as a smoke test: the real done-check is running the subverbs your project
-uses explicitly — `verify --codegen`, and, where a DB exists, `verify --db <url>`.
-The Node `meta verify` ends every run, bare or not, with a `not run:` line naming
-each gate it skipped and the flag that selects it; on a model with no templates a
-bare run checks nothing but the requirement ledger and still exits 0, so never
-wire a bare `meta verify` into CI as the whole gate.
+**A bare `verify` runs the code gates, not the database gate.** In every port a bare
+run covers codegen drift (stale generated code), prompt-template drift and the
+requirement ledger, paired with the advisory anti-pattern pass above. `verify --db
+<url>`, `--deps` and `--replay` stay opt-in (`--db` is Node `meta` only). A bare run
+skips a gate it has no configuration for and says so in one line: Node `meta` with
+no `metaobjects.config.ts`, Python with no `metaobjects.config.yaml`, `dotnet meta`
+with no `--out <dir>` or `codegen/Generators.cs`, Maven with no `templateRoot`. The
+Node `meta verify` ends every run, bare or not, with a `not run:` line naming each
+gate it skipped and the flag that selects it; read it, because a skipped gate is a
+gate that did not guard the build.
 
 ## Requirements are checked on every run
 

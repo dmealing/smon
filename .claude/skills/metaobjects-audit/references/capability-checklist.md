@@ -198,8 +198,10 @@ soft-delete / status / type view it models.
   and are NOT in the cross-port registry — `view.text`, `view.textarea`, `view.date`,
   `view.month`, `view.hotlink`, `view.image`, `view.dropdown`, `view.radio`, `view.checkbox`,
   `view.number`, `view.password`, `view.hidden`, `view.web`. Every port LOADS them, so shared metadata that
-  carries them is valid in a backend port; nothing outside TS/web reads them. **Audit these
-  only for TS adopters.** Only
+  carries them is valid in a backend port. The one exception is `view.password`: every port's generated
+  routes read it as a credential, so it is never returned and never written (see
+  "Credentials and excluded fields" in `docs/features/api-contract.md`).
+  Audit the other widgets only for TS adopters. Only
   `view.base` / `view.currency` are cross-port-gated.
 
 ## Template — `template.*` (prompt pillar)

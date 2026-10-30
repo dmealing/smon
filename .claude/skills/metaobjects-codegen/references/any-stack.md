@@ -34,7 +34,7 @@ reference generators target React and TanStack. Anything else is this page.
 | Layer | Always available | When your target is not built in |
 |---|---|---|
 | **model** — types, create/PATCH validation, filter and sort allowlists | yes, in every port, for every store | — |
-| **persistence** — how rows are read and written | Postgres, SQLite, D1; MySQL (TypeScript, Java) | §3 |
+| **persistence** — how rows are read and written | Postgres, SQLite, D1; MySQL (TypeScript, Java); a Prisma schema (TypeScript) | §3 |
 | **api** — the HTTP surface | Fastify, Hono | §4 |
 | **client** — hooks, forms, grids | React, TanStack | §5 |
 
@@ -51,6 +51,12 @@ target `drizzle-orm/mysql-core`, and the ObjectManager runs over `kyselyDriver` 
 the column-type table and the behaviour differences are in `typescript-mysql.md`. On Java,
 OMDB's `MySQLDriver` reads and writes MySQL; the generated DTOs and controllers are
 dialect-neutral.
+
+**Prisma as the ORM (TypeScript).** Set `orm: "prisma"` and wire `prismaSchemaFile()`. The
+model then writes `schema.prisma` (Postgres, MySQL, SQLite) beside Zod schemas and types, and
+Prisma runs the database. `meta verify --codegen` and `--db` gate it. Setup, the mapping and
+what it refuses are in `typescript-prisma.md`. Any other ORM (TypeORM, Sequelize, MikroORM) is
+a generator you write: the Prisma one is a model to copy (`meta eject prisma-schema`).
 
 **A SQL database that speaks another dialect's protocol.** Use that dialect: CockroachDB,
 Neon, Supabase, AlloyDB and Aurora PostgreSQL are `postgres`; Turso and libSQL are `sqlite`

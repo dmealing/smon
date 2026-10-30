@@ -166,7 +166,8 @@ drift at build time instead of letting a prompt silently degrade.
 `@textRef` is a 2-layer logical reference `group/source` (folder/file,
 table/key, collection/document). The prompt text itself **never lives in
 metadata** — at runtime a configured **provider** resolves the reference to the
-actual Mustache text:
+actual template text (Mustache in every port; Python and TypeScript also accept Jinja, see
+below):
 
 - a filesystem provider (L1 = folder, L2 = file) — the dev default:
   `lobby/welcome` → `<root>/lobby/welcome.mustache`. It is `FilesystemProvider` in every
@@ -180,6 +181,18 @@ actual Mustache text:
 
 Locale, A/B, dynamic, and evolutionary prompt variants all live behind the
 provider seam without touching metadata.
+
+**Jinja bodies (Python and TypeScript only, ADR-0061).** A body may be a Jinja file —
+`lobby/welcome.jinja` (or `.j2` / `.jinja2`) — instead of `welcome.mustache`; the
+`@textRef` does not change, and the metadata never names an engine. Python renders it with
+jinja2 (the `metaobjects[jinja]` extra), TypeScript with nunjucks. The same `verify` gate
+checks it against the payload, walking the parsed template, and reports what it cannot
+settle statically (`user[key]`, a computed include name) as `ERR_TEMPLATE_NOT_STATIC`. Java,
+Kotlin and C# refuse a Jinja body with `ERR_TEMPLATE_ENGINE_UNSUPPORTED`, so a model that
+must render in those ports keeps Mustache. Prefer Mustache for new templates: it is the
+cross-port engine, and its logic-less shape is what pushes conditionals into the payload
+(next sections). Jinja is for adopting existing Jinja templates without rewriting them; per
+port reference files say how.
 
 ## `render()` is deterministic + byte-stable
 
@@ -244,7 +257,8 @@ against each value of the dimension and snapshot every variant.
 ## `verify` fails the build on prompt-drift
 
 For every template, the verify step resolves the text, parses each `{{...}}`
-reference, and checks it exists on the payload VO. If the text references
+reference (Mustache, or a Jinja body in Python and TypeScript), and checks it exists on the
+payload VO. If the text references
 `{{authorName}}` but the payload only has `displayName`, **the build fails.** This
 is the prompt-vs-payload drift gate — run it in CI. It walks both `template.prompt`
 and `template.output` nodes the same way (both RENDER; only the direction of what comes
