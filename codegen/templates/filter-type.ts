@@ -16,6 +16,7 @@ import {
   opsForField,
 } from "@metaobjectsdev/metadata";
 import { isSortableField } from "./filter-shared.js";
+import { entityTypeNames } from "./entity-type-names.js";
 import { enumValues } from "@metaobjectsdev/codegen-ts/engine";
 
 // currency is integer minor units (allowlist `integer: true`, row schema `z.number().int()`).
@@ -79,6 +80,7 @@ function renderFieldUnion(field: MetaField): string {
  * the server's per-subtype allowlist.
  */
 export function renderFilterType(entity: MetaObject, exclude?: string): Code {
+  const filterName = entityTypeNames(entity).filter;
   // fields() returns effective fields, so inherited fields (from extends:/super:) are included in filter types.
   const allFields = entity.fields().filter((c) => c.name !== exclude);
   const filterableFieldsList = allFields.filter((c) => c.attr(FIELD_ATTR_FILTERABLE) === true);
@@ -93,12 +95,12 @@ export function renderFilterType(entity: MetaObject, exclude?: string): Code {
 
   if (fieldLines.length === 0 && sortFieldNames.length === 0) {
     return code`
-export type ${entity.name}Filter = {
+export type ${filterName} = {
   limit?: number;
   offset?: number;
   sort?: string;
-  or?: ${entity.name}Filter[];
-  and?: ${entity.name}Filter[];
+  or?: ${filterName}[];
+  and?: ${filterName}[];
 };
 `;
   }
@@ -112,13 +114,13 @@ export type ${entity.name}Filter = {
         })();
 
   return code`
-export type ${entity.name}Filter = {
+export type ${filterName} = {
   limit?: number;
   offset?: number;
   sort?: ${sortType};
 ${fieldLines.join("\n")}
-  or?: ${entity.name}Filter[];
-  and?: ${entity.name}Filter[];
+  or?: ${filterName}[];
+  and?: ${filterName}[];
 };
 `;
 }

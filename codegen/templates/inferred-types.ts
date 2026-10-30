@@ -44,6 +44,7 @@ import { sharedEnumForField } from "@metaobjectsdev/codegen-ts/engine";
 import { sharedEnumImportSpecifier, providedEnumImportSpecifier } from "@metaobjectsdev/codegen-ts/engine";
 import type { RenderContext } from "@metaobjectsdev/codegen-ts/engine";
 import { effectivePackage } from "@metaobjectsdev/codegen-ts/engine";
+import { entityTypeNames } from "./entity-type-names.js";
 
 /**
  * Emit Drizzle's InferSelectModel / InferInsertModel aliases for an entity.
@@ -71,7 +72,7 @@ export function renderInferredTypes(
   const insertSym = imp("t:InferInsertModel@drizzle-orm");
   const docs = renderDocsFor(entity);
   const docsPrefix = docs ? `${docs}\n` : "";
-  const rowName = tphBase ? `${entity.name}Row` : entity.name;
+  const { row: rowName, insert: insertName, update: updateName } = entityTypeNames(entity, { tphBase });
   // #214 — a write-through entity read-view routes READS to the replica view, so the
   // read row type <Entity> is emitted from the VIEW's read schema (z.infer, carrying
   // the derived fields) by the entity-file composer, NOT here. `skipRow` suppresses
@@ -80,14 +81,14 @@ export function renderInferredTypes(
   // inferred from the write TABLE (derived-free, #213).
   if (skipRow) {
     return code`
-export type ${entity.name}Insert = ${insertSym}<typeof ${varName}>;
-export type ${entity.name}Update = Partial<${entity.name}Insert>;
+export type ${insertName} = ${insertSym}<typeof ${varName}>;
+export type ${updateName} = Partial<${insertName}>;
 `;
   }
   return code`
 ${docsPrefix}export type ${rowName} = ${selectSym}<typeof ${varName}>;
-export type ${entity.name}Insert = ${insertSym}<typeof ${varName}>;
-export type ${entity.name}Update = Partial<${entity.name}Insert>;
+export type ${insertName} = ${insertSym}<typeof ${varName}>;
+export type ${updateName} = Partial<${insertName}>;
 `;
 }
 
