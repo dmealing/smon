@@ -123,7 +123,8 @@ function renderEntity(entity: MetaObject, ctx: RenderContext, opts?: RenderEntit
   // #214 — a write-through entity read-view (writable table + a read-only replica view +
   // derived origin.* fields) needs the hybrid file (table + `.existing()` view decl + a
   // z.infer read type carrying the derived fields). Delegate to `renderEntityFile` (copied
-  // beside this file, `templates/entity-file.ts`) rather than duplicate that branch here (mirrors the projection delegation above).
+  // beside this file, `templates/entity-file.ts`) rather than duplicate that branch here
+  // (mirrors the projection delegation above).
   if (isWriteThrough(entity)) {
     return renderEntityFile(entity, ctx, { allowlists });
   }
